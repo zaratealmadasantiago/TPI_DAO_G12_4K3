@@ -5,29 +5,56 @@ from datetime import datetime
 
 logistica_bp = Blueprint('logistica', __name__, url_prefix='/api/v1/logistica')
 
-@logistica_bp.route('/bultos/<int:id_bulto>/cambiar-estado', methods=['POST'])
-def cambiar_estado_bulto(id_bulto):
+@logistica_bp.route('/bultos', methods=['GET'])
+def listar_bultos():
+    db = SessionLocal()
+    try:
+        bultos = db.query(Bulto).all()
+        resultado = [{
+            "idBulto": b.idBulto,
+            "codigoBulto": b.codigoBulto,
+            "codigoPrecinto": b.codigoPrecinto,
+            "precintoIntacto": b.precintoIntacto,
+            "estadoActual": b.estadoActual.nombreEstado if b.estadoActual else "SIN_ESTADO",
+            "idRemito": b.idRemito
+        } for b in bultos]
+        return jsonify({"status": "success", "datos": resultado}), 200
+    finally:
+        db.close()
+
+@logistica_bp.route('/bultos/<int:id_bulto>/verificar-precinto', methods=['POST'])
+def verificar_precinto_bulto(id_bulto):
     """
-    Transiciona el estado del bulto y guarda el registro inmutable en CambioEstado (trazabilidad).
+    Aplica la regla del Patrón State: Inspecciona el precinto.
+    Si coincide y está intacto transiciona a 'Verificado'; si falla, pasa a 'Rechazado'.
     """
     data = request.json
-    id_nuevo_estado = data.get('idNuevoEstado')
+    codigo_ingresado = data.get('codigoPrecinto')
     
     db = SessionLocal()
     try:
         bulto = db.query(Bulto).get(id_bulto)
-        nuevo_estado = db.query(EstadoBulto).get(id_nuevo_estado)
+        if not bulto:
+            return jsonify({"status": "error", "mensaje": "Bulto no encontrado"}), 404
 
-        if not bulto or not nuevo_estado:
-            return jsonify({"error": "Bulto o Estado no encontrado"}), 404
+        # Obtener estados de la BD
+        estado_verificado = db.query(EstadoBulto).filter(EstadoBulto.tipo == 'verificado').first()
+        estado_rechazado = db.query(EstadoBulto).filter(EstadoBulto.tipo == 'rechazado').first()
 
-        # Marcar cambio de estado anterior en el historial
+        # Evaluación de regla de negocio
+        if bulto.codigoPrecinto == codigo_ingresado and bulto.precintoIntacto:
+            nuevo_estado = estado_verificado
+            mensaje = "Precinto verificado correctamente. Bulto en estado VERIFICADO."
+        else:
+            bulto.precintoIntacto = False
+            nuevo_estado = estado_rechazado
+            mensaje = "Precinto violado o incorrecto. Bulto RECHAZADO."
+
+        # Registrar trazabilidad inmutable (CambioEstado)
         db.query(CambioEstado).filter(CambioEstado.idBulto == id_bulto, CambioEstado.esActual == True).update({"esActual": False})
-
-        # Actualizar estado actual del bulto
-        bulto.idEstadoActual = nuevo_estado.idEstado
-
-        # Crear nueva fila inmutable de CambioEstado
+        
+        bulto.estadoActual = nuevo_estado
+        
         nuevo_cambio = CambioEstado(
             fechaHoraInicio=datetime.utcnow(),
             esActual=True,
@@ -38,9 +65,9 @@ def cambiar_estado_bulto(id_bulto):
         db.add(nuevo_cambio)
         db.commit()
 
-        return jsonify({"mensaje": f"Bulto {bulto.codigoBulto} actualizado a estado: {nuevo_estado.nombreEstado}"}), 200
+        return jsonify({"status": "success", "mensaje": mensaje, "nuevoEstado": nuevo_estado.nombreEstado}), 200
     except Exception as e:
         db.rollback()
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"status": "error", "mensaje": str(e)}), 500
     finally:
         db.close()
