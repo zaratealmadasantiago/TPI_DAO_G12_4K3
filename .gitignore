@@ -13,6 +13,24 @@ ENV/
 backend/datos/*.sqlite3
 *.sqlite3
 
-# Archivos de configuración de IDEs y Editores
+node_modules/
+frontend/node_modules/
+
+# Archivos de build y dist de React/Vite
+dist/
+build/
+*.local
+
+# Logs de error de npm
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
 .vscode/
 .idea/
+*.swp
+
+# Sistema Operativo
+.DS_Store
+Thumbs.db
+

@@ -30,19 +30,20 @@ def reset_and_seed():
         db.add_all([e_preparado, e_precintado, e_transito, e_verificado, e_rechazado])
         db.flush()
 
-        # 2. Centros de Distribucion (4 filas)
+        # 2. Centro de Distribucion UNICO
         cd1 = CentroDistribucion(codigo="CD01", nombre="CD Central Buenos Aires", direccion="Av. Corrientes 1000", telefono="011-4000-0001", codigoOperativo="CD-BA-01")
-        cd2 = CentroDistribucion(codigo="CD02", nombre="CD Norte Cordoba", direccion="Av. Colon 5000", telefono="0351-400-0002", codigoOperativo="CD-CBA-02")
-        cd3 = CentroDistribucion(codigo="CD03", nombre="CD Cuyo Mendoza", direccion="Ruta 40 Km 12", telefono="0261-400-0003", codigoOperativo="CD-MDZ-03")
-        cd4 = CentroDistribucion(codigo="CD04", nombre="CD Litoral Rosario", direccion="Av. Pellegrini 3000", telefono="0341-400-0004", codigoOperativo="CD-ROS-04")
-        db.add_all([cd1, cd2, cd3, cd4])
+        db.add(cd1)
 
-        # 3. Sucursales (4 filas)
+        # 3. Sucursales (7 filas)
         suc1 = Sucursal(codigo="SUC01", nombre="Sucursal Palermo", direccion="Av. Santa Fe 2500", telefono="011-5000-0001", numeroSucursal=101, habilitadaVenta=True)
         suc2 = Sucursal(codigo="SUC02", nombre="Sucursal Belgrano", direccion="Av. Cabildo 1800", telefono="011-5000-0002", numeroSucursal=102, habilitadaVenta=True)
         suc3 = Sucursal(codigo="SUC03", nombre="Sucursal Cordoba Centro", direccion="Peatonal San Martin 150", telefono="0351-500-0003", numeroSucursal=201, habilitadaVenta=True)
         suc4 = Sucursal(codigo="SUC04", nombre="Sucursal Rosario Centro", direccion="Peatonal Cordoba 800", telefono="0341-500-0004", numeroSucursal=301, habilitadaVenta=True)
-        db.add_all([suc1, suc2, suc3, suc4])
+        suc5 = Sucursal(codigo="SUC05", nombre="Sucursal Norte Cordoba", direccion="Av. Colon 5000", telefono="0351-400-0002", numeroSucursal=202, habilitadaVenta=True)
+        suc6 = Sucursal(codigo="SUC06", nombre="Sucursal Cuyo Mendoza", direccion="Ruta 40 Km 12", telefono="0261-400-0003", numeroSucursal=401, habilitadaVenta=True)
+        suc7 = Sucursal(codigo="SUC07", nombre="Sucursal Litoral Rosario", direccion="Av. Pellegrini 3000", telefono="0341-400-0004", numeroSucursal=302, habilitadaVenta=True)
+        
+        db.add_all([suc1, suc2, suc3, suc4, suc5, suc6, suc7])
         db.flush()
 
         # 4. Proveedores (4 filas)
@@ -68,18 +69,19 @@ def reset_and_seed():
         db.add_all([p1, p2, p3, p4])
         db.flush()
 
-        # 7. StockItems (4 filas)
+        # 7. StockItems (Asignaciones de Stock a Sucursales y al unico CD)
         st1 = StockItem(cantidadDisponible=15, cantidadReservada=2, producto=p1, establecimiento=suc1)
         st2 = StockItem(cantidadDisponible=50, cantidadReservada=5, producto=p2, establecimiento=suc2)
         st3 = StockItem(cantidadDisponible=10, cantidadReservada=0, producto=p3, establecimiento=suc3)
-        st4 = StockItem(cantidadDisponible=100, cantidadReservada=10, producto=p4, establecimiento=cd1)
-        db.add_all([st1, st2, st3, st4])
+        st4 = StockItem(cantidadDisponible=100, cantidadReservada=10, producto=p4, establecimiento=cd1) # Stock en CD central
+        st5 = StockItem(cantidadDisponible=25, cantidadReservada=0, producto=p1, establecimiento=suc5)
+        db.add_all([st1, st2, st3, st4, st5])
 
-        # 8. Ordenes de Reposicion (4 filas)
+        # 8. Ordenes de Reposicion (Todas parten del unico CD Central cd1)
         ord1 = OrdenReposicion(numeroOrden="ORD-2026-001", fechaSolicitud=datetime.utcnow() - timedelta(days=5), estado="DESPACHADA", origen=cd1, destino=suc1)
-        ord2 = OrdenReposicion(numeroOrden="ORD-2026-002", fechaSolicitud=datetime.utcnow() - timedelta(days=3), estado="EN_TRANSITO", origen=cd2, destino=suc3)
+        ord2 = OrdenReposicion(numeroOrden="ORD-2026-002", fechaSolicitud=datetime.utcnow() - timedelta(days=3), estado="EN_TRANSITO", origen=cd1, destino=suc3)
         ord3 = OrdenReposicion(numeroOrden="ORD-2026-003", fechaSolicitud=datetime.utcnow() - timedelta(days=1), estado="CREADA", origen=cd1, destino=suc2)
-        ord4 = OrdenReposicion(numeroOrden="ORD-2026-004", fechaSolicitud=datetime.utcnow(), estado="CREADA", origen=cd4, destino=suc4)
+        ord4 = OrdenReposicion(numeroOrden="ORD-2026-004", fechaSolicitud=datetime.utcnow(), estado="CREADA", origen=cd1, destino=suc7)
         db.add_all([ord1, ord2, ord3, ord4])
         db.flush()
 
@@ -90,11 +92,11 @@ def reset_and_seed():
         do4 = DetalleOrden(cantidadSolicitada=80, orden=ord4, producto=p4)
         db.add_all([do1, do2, do3, do4])
 
-        # 10. Remitos (4 filas)
+        # 10. Remitos (Todos despachados desde el unico CD Central cd1)
         rem1 = Remito(numeroRemito="REM-001-0001", fechaEmision=datetime.utcnow() - timedelta(days=4), origen=cd1, destino=suc1)
-        rem2 = Remito(numeroRemito="REM-002-0002", fechaEmision=datetime.utcnow() - timedelta(days=2), origen=cd2, destino=suc3)
+        rem2 = Remito(numeroRemito="REM-001-0002", fechaEmision=datetime.utcnow() - timedelta(days=2), origen=cd1, destino=suc3)
         rem3 = Remito(numeroRemito="REM-001-0003", fechaEmision=datetime.utcnow() - timedelta(days=1), origen=cd1, destino=suc2)
-        rem4 = Remito(numeroRemito="REM-004-0004", fechaEmision=datetime.utcnow(), origen=cd4, destino=suc4)
+        rem4 = Remito(numeroRemito="REM-001-0004", fechaEmision=datetime.utcnow(), origen=cd1, destino=suc7)
         db.add_all([rem1, rem2, rem3, rem4])
         db.flush()
 
@@ -143,7 +145,7 @@ def reset_and_seed():
         db.add_all([dev1, dev2, dev3, dev4])
 
         db.commit()
-        print("Sembrado completado con exito! Se cargaron al menos 4 filas por tabla en datos.sqlite3.")
+        print("Sembrado completado con exito! Se cargaron 1 Centro de Distribucion y 7 Sucursales en datos.sqlite3.")
 
     except Exception as e:
         db.rollback()
