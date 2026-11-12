@@ -66,159 +66,181 @@ export default function EstablecimientosABM() {
   };
 
   return (
-    <div style={{ padding: '20px' }}>
-      <h2>Administrar Sucursales y Centros de Distribución</h2>
+    <div className="page">
+      <h2 className="page-title">Administrar Sucursales y Centros de Distribución</h2>
 
       {/* Formulario de Alta */}
-      <div style={{ marginBottom: '15px' }}>
-        <label style={{ marginRight: '15px', cursor: 'pointer' }}>
-          <input 
-            type="radio" 
-            name="tipo" 
-            checked={tipoForm === 'sucursal'} 
-            onChange={() => setTipoForm('sucursal')} 
-          /> <strong>Sucursal / Local</strong>
-        </label>
-        <label style={{ cursor: 'pointer' }}>
-          <input 
-            type="radio" 
-            name="tipo" 
-            checked={tipoForm === 'cd'} 
-            onChange={() => setTipoForm('cd')} 
-          /> <strong>Centro de Distribución</strong>
-        </label>
-      </div>
+      <section className="card">
+        <h3 className="card-title">Nuevo establecimiento</h3>
 
-      <form onSubmit={handleSubmit} style={{ marginBottom: '20px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-        <input 
-          placeholder="Código" 
-          value={form.codigo} 
-          onChange={e => setForm({...form, codigo: e.target.value})} 
-          required 
-        />
-        <input 
-          placeholder="Nombre" 
-          value={form.nombre} 
-          onChange={e => setForm({...form, nombre: e.target.value})} 
-          required 
-        />
-        <input 
-          placeholder="Dirección" 
-          value={form.direccion} 
-          onChange={e => setForm({...form, direccion: e.target.value})} 
-          required 
-        />
-        <input 
-          placeholder="Teléfono" 
-          value={form.telefono} 
-          onChange={e => setForm({...form, telefono: e.target.value})} 
-        />
+        <div className="toggle">
+          <label className={`toggle-option ${tipoForm === 'sucursal' ? 'active' : ''}`}>
+            <input
+              type="radio"
+              name="tipo"
+              checked={tipoForm === 'sucursal'}
+              onChange={() => setTipoForm('sucursal')}
+            /> Sucursal / Local
+          </label>
+          <label className={`toggle-option ${tipoForm === 'cd' ? 'active' : ''}`}>
+            <input
+              type="radio"
+              name="tipo"
+              checked={tipoForm === 'cd'}
+              onChange={() => setTipoForm('cd')}
+            /> Centro de Distribución
+          </label>
+        </div>
 
-        {tipoForm === 'sucursal' ? (
-          <input 
-            type="number"
-            placeholder="N° Sucursal" 
-            value={form.numeroSucursal} 
-            onChange={e => setForm({...form, numeroSucursal: e.target.value})} 
-            required 
-          />
-        ) : (
-          <input 
-            placeholder="Código Operativo CD" 
-            value={form.codigoOperativo} 
-            onChange={e => setForm({...form, codigoOperativo: e.target.value})} 
-            required 
-          />
-        )}
+        <form onSubmit={handleSubmit}>
+          <div className="form-grid">
+            <input
+              className="input"
+              placeholder="Código"
+              value={form.codigo}
+              onChange={e => setForm({...form, codigo: e.target.value})}
+              required
+            />
+            <input
+              className="input"
+              placeholder="Nombre"
+              value={form.nombre}
+              onChange={e => setForm({...form, nombre: e.target.value})}
+              required
+            />
+            <input
+              className="input"
+              placeholder="Dirección"
+              value={form.direccion}
+              onChange={e => setForm({...form, direccion: e.target.value})}
+              required
+            />
+            <input
+              className="input"
+              placeholder="Teléfono"
+              value={form.telefono}
+              onChange={e => setForm({...form, telefono: e.target.value})}
+            />
 
-        <button type="submit">Agregar {tipoForm === 'sucursal' ? 'Sucursal' : 'Centro Distribución'}</button>
-      </form>
+            {tipoForm === 'sucursal' ? (
+              <input
+                className="input"
+                type="number"
+                placeholder="N° Sucursal"
+                value={form.numeroSucursal}
+                onChange={e => setForm({...form, numeroSucursal: e.target.value})}
+                required
+              />
+            ) : (
+              <input
+                className="input"
+                placeholder="Código Operativo CD"
+                value={form.codigoOperativo}
+                onChange={e => setForm({...form, codigoOperativo: e.target.value})}
+                required
+              />
+            )}
+          </div>
+
+          <div className="form-actions">
+            <button type="submit" className="btn btn-primary">
+              Agregar {tipoForm === 'sucursal' ? 'Sucursal' : 'Centro Distribución'}
+            </button>
+          </div>
+        </form>
+      </section>
 
       {/* Tabla de Establecimientos */}
-      <h3>Seleccione un Establecimiento para ver su Stock puntualmente:</h3>
-      <table border="1" cellPadding="8" style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '30px' }}>
-        <thead>
-          <tr style={{ backgroundColor: '#f2f2f2' }}>
-            <th>ID</th>
-            <th>Tipo</th>
-            <th>Código</th>
-            <th>Nombre</th>
-            <th>Dirección</th>
-            <th>Acción</th>
-          </tr>
-        </thead>
-        <tbody>
-          {establecimientos.map(e => (
-            <tr 
-              key={e.idEstablecimiento}
-              style={{ 
-                backgroundColor: establecimientoSeleccionado?.idEstablecimiento === e.idEstablecimiento ? '#e6f7ff' : 'transparent',
-                cursor: 'pointer'
-              }}
-              onClick={() => handleSeleccionarEstablecimiento(e)}
-            >
-              <td>{e.idEstablecimiento}</td>
-              <td><strong>{e.tipo === 'sucursal' ? 'Sucursal' : 'Centro Distribución'}</strong></td>
-              <td>{e.codigo}</td>
-              <td>{e.nombre}</td>
-              <td>{e.direccion}</td>
-              <td>
-                <button onClick={(event) => {
-                  event.stopPropagation();
-                  handleSeleccionarEstablecimiento(e);
-                }}>
-                  Ver Productos
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <section className="card">
+        <h3 className="card-title">Seleccione un Establecimiento para ver su Stock puntualmente:</h3>
+        <div className="table-wrap">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Tipo</th>
+                <th>Código</th>
+                <th>Nombre</th>
+                <th>Dirección</th>
+                <th className="right">Acción</th>
+              </tr>
+            </thead>
+            <tbody>
+              {establecimientos.map(e => (
+                <tr
+                  key={e.idEstablecimiento}
+                  className={establecimientoSeleccionado?.idEstablecimiento === e.idEstablecimiento ? 'selected' : ''}
+                >
+                  <td className="muted">{e.idEstablecimiento}</td>
+                  <td>
+                    <span className={`tag ${e.tipo === 'sucursal' ? '' : 'tag-primary'}`}>
+                      {e.tipo === 'sucursal' ? 'Sucursal' : 'Centro Distribución'}
+                    </span>
+                  </td>
+                  <td>{e.codigo}</td>
+                  <td className="strong">{e.nombre}</td>
+                  <td>{e.direccion}</td>
+                  <td className="right">
+                    <button
+                      className="btn btn-outline btn-sm"
+                      onClick={() => handleSeleccionarEstablecimiento(e)}
+                    >
+                      Ver Productos
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
 
       {/* Panel Detalle de Productos del Establecimiento Seleccionado */}
       {establecimientoSeleccionado && (
-        <div style={{ padding: '15px', border: '2px solid #1890ff', borderRadius: '5px', backgroundColor: '#fafafa' }}>
-          <h3>
-            Productos en stock para: <span style={{ color: '#1890ff' }}>{establecimientoSeleccionado.nombre}</span> ({establecimientoSeleccionado.tipo})
+        <section className="card highlight">
+          <h3 className="card-title">
+            Productos en stock para: <span className="accent">{establecimientoSeleccionado.nombre}</span> <span className="muted">({establecimientoSeleccionado.tipo})</span>
           </h3>
-          
+
           {cargandoStock ? (
-            <p>Cargando productos...</p>
+            <p className="empty-text">Cargando productos...</p>
           ) : productosStock.length === 0 ? (
-            <p>Este establecimiento no tiene registrado stock de ningún producto actualmente.</p>
+            <p className="empty-text">Este establecimiento no tiene registrado stock de ningún producto actualmente.</p>
           ) : (
-            <table border="1" cellPadding="8" style={{ width: '100%', borderCollapse: 'collapse', backgroundColor: '#fff' }}>
-              <thead>
-                <tr style={{ backgroundColor: '#e6f7ff' }}>
-                  <th>Código de Barras</th>
-                  <th>Producto</th>
-                  <th>Precio Venta</th>
-                  <th>Stock Disponible</th>
-                  <th>Stock Reservado</th>
-                  <th>Alerta Stock Mínimo</th>
-                </tr>
-              </thead>
-              <tbody>
-                {productosStock.map(item => (
-                  <tr key={item.idStockItem}>
-                    <td>{item.codigoBarras}</td>
-                    <td><strong>{item.nombre}</strong></td>
-                    <td>${item.precioVenta}</td>
-                    <td>{item.cantidadDisponible} u.</td>
-                    <td>{item.cantidadReservada} u.</td>
-                    <td>
-                      {item.cantidadDisponible <= item.stockMinimo ? (
-                        <span style={{ color: 'red', fontWeight: 'bold' }}>⚠️ Bajo Stock (Mín: {item.stockMinimo})</span>
-                      ) : (
-                        <span style={{ color: 'green' }}>OK</span>
-                      )}
-                    </td>
+            <div className="table-wrap">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Código de Barras</th>
+                    <th>Producto</th>
+                    <th className="right">Precio Venta</th>
+                    <th className="right">Stock Disponible</th>
+                    <th className="right">Stock Reservado</th>
+                    <th>Alerta Stock Mínimo</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {productosStock.map(item => (
+                    <tr key={item.idStockItem}>
+                      <td>{item.codigoBarras}</td>
+                      <td className="strong">{item.nombre}</td>
+                      <td className="right">${item.precioVenta}</td>
+                      <td className="right">{item.cantidadDisponible} u.</td>
+                      <td className="right">{item.cantidadReservada} u.</td>
+                      <td>
+                        {item.cantidadDisponible <= item.stockMinimo ? (
+                          <span className="tag tag-danger">Bajo Stock (Mín: {item.stockMinimo})</span>
+                        ) : (
+                          <span className="tag tag-success">OK</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
-        </div>
+        </section>
       )}
     </div>
   );

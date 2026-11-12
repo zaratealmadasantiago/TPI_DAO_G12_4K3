@@ -8,13 +8,18 @@ export default function App() {
 
   return (
     <div>
-      <nav style={{ padding: '15px', backgroundColor: '#333', color: '#fff', display: 'flex', gap: '20px' }}>
-        <button onClick={() => setTab('establecimientos')}>Establecimientos</button>
-        <button onClick={() => setTab('productos')}>ABM Productos</button>
-        <button onClick={() => setTab('logistica')}>Logística (State)</button>
+      <nav className="navbar">
+        <div className="navbar-inner">
+          <div className="navbar-brand">Ventas <span>&</span> Inventario</div>
+          <div className="navbar-links">
+            <button className={`nav-link ${tab === 'establecimientos' ? 'active' : ''}`} onClick={() => setTab('establecimientos')}>Establecimientos</button>
+            <button className={`nav-link ${tab === 'productos' ? 'active' : ''}`} onClick={() => setTab('productos')}>Productos</button>
+            <button className={`nav-link ${tab === 'logistica' ? 'active' : ''}`} onClick={() => setTab('logistica')}>Logística</button>
+          </div>
+        </div>
       </nav>
 
-      <main>
+      <main className="main">
         {tab === 'establecimientos' && <EstablecimientosABM />}
         {tab === 'productos' && <ProductosABM />}
         {tab === 'logistica' && <LogisticaBultos />}
