@@ -1,15 +1,19 @@
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from models.base import Base
+
+GMT_MINUS_3 = timezone(timedelta(hours=-3))
+
+def ahora_gmt3():
+    return datetime.now(GMT_MINUS_3).replace(tzinfo=None)
 
 class OrdenReposicion(Base):
     __tablename__ = 'ordenes_reposicion'
 
     idOrden = Column(Integer, primary_key=True, autoincrement=True)
     numeroOrden = Column(String(50), nullable=False, unique=True)
-    fechaSolicitud = Column(DateTime, default=datetime.utcnow)
-    estado = Column(String(50), default="CREADA")
+    fechaSolicitud = Column(DateTime, default=ahora_gmt3)
 
     idOrigen = Column(Integer, ForeignKey('centros_distribucion.idEstablecimiento'), nullable=False)
     idDestino = Column(Integer, ForeignKey('sucursales.idEstablecimiento'), nullable=False)
@@ -98,7 +102,8 @@ class CambioEstado(Base):
     __tablename__ = 'cambios_estado'
 
     idCambioEstado = Column(Integer, primary_key=True, autoincrement=True)
-    fechaHoraInicio = Column(DateTime, default=datetime.utcnow)
+    fechaHoraInicio = Column(DateTime, default=ahora_gmt3)
+    fechaHoraFin = Column(DateTime, nullable=True)
     esActual = Column(Boolean, default=True)
     esInicial = Column(Boolean, default=False)
 

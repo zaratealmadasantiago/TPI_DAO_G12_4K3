@@ -22,8 +22,31 @@ export const apiService = {
   },
 
   // --- Logística & Bultos (Patrón State) ---
-  getBultos: async () => {
-    const res = await fetch(`${API_BASE_URL}/logistica/bultos`);
+  getBultos: async (idSucursal) => {
+    const query = idSucursal ? `?idSucursal=${idSucursal}` : '';
+    const res = await fetch(`${API_BASE_URL}/logistica/bultos${query}`);
+    return res.json();
+  },
+  asignarPrecinto: async (idBulto, codigoPrecinto) => {
+    const res = await fetch(`${API_BASE_URL}/logistica/bultos/${idBulto}/asignar-precinto`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ codigoPrecinto }),
+    });
+    return res.json();
+  },
+  confirmarEnvio: async (idBulto) => {
+    const res = await fetch(`${API_BASE_URL}/logistica/bultos/${idBulto}/confirmar-envio`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    return res.json();
+  },
+  confirmarRecepcion: async (idBulto) => {
+    const res = await fetch(`${API_BASE_URL}/logistica/bultos/${idBulto}/confirmar-recepcion`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
     return res.json();
   },
   verificarPrecinto: async (idBulto, codigoPrecinto) => {
@@ -31,6 +54,28 @@ export const apiService = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ codigoPrecinto }),
+    });
+    return res.json();
+  },
+  rechazarPrecintoViolado: async (idBulto) => {
+    const res = await fetch(`${API_BASE_URL}/logistica/bultos/${idBulto}/rechazar-violado`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    return res.json();
+  },
+
+  // --- Logística: Órdenes de Reposición ---
+  getOrdenesReposicion: async (idSucursal) => {
+    const query = idSucursal ? `?idSucursal=${idSucursal}` : '';
+    const res = await fetch(`${API_BASE_URL}/logistica/ordenes-reposicion${query}`);
+    return res.json();
+  },
+  crearOrdenReposicion: async (idDestino, detalles) => {
+    const res = await fetch(`${API_BASE_URL}/logistica/ordenes-reposicion`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idDestino, detalles }),
     });
     return res.json();
   },

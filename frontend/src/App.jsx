@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import ProductosABM from './components/ProductosABM';
-import LogisticaBultos from './components/LogisticaBultos';
+import LogisticaModulo from './components/LogisticaModulo';
 import EstablecimientosABM from './components/EstablecimientosABM';
 
 export default function App() {
@@ -22,7 +22,7 @@ export default function App() {
       <main className="main">
         {tab === 'establecimientos' && <EstablecimientosABM />}
         {tab === 'productos' && <ProductosABM />}
-        {tab === 'logistica' && <LogisticaBultos />}
+        {tab === 'logistica' && <LogisticaModulo />}
       </main>
     </div>
   );

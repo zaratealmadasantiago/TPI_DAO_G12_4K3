@@ -1,36 +1,41 @@
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from database import SessionLocal, engine, DB_PATH
 from models.base import Base
 from models import (
     CentroDistribucion, Sucursal, Proveedor, Categoria, Producto, StockItem,
     OrdenReposicion, DetalleOrden, Remito, Bulto, CambioEstado,
-    PreparadoState, PrecintadoState, EnTransitoState, VerificadoState, RechazadoState,
+    PreparadoState, PrecintadoState, EnTransitoState, RecibidoState, VerificadoState, RechazadoState,
     Venta, DetalleVenta, Efectivo, TarjetaCredito, Transferencia, Devolucion
 )
 
+GMT_MINUS_3 = timezone(timedelta(hours=-3))
+
+def ahora_gmt3():
+    return datetime.now(GMT_MINUS_3).replace(tzinfo=None)
+
 def reset_and_seed():
     print("Reseteando esquemas de la base de datos SQLite3...")
-    
-    # 1. Eliminar y recrear todas las tablas para garantizar limpieza
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
-    
+
     db = SessionLocal()
 
     try:
         print("Iniciando sembrado de datos en la BD...")
+        ahora = ahora_gmt3()
 
-        # 1. Estados de Bulto (Patron State)
+        # 1. Estados de Bulto (Patrón State - 6 estados completos)
         e_preparado = PreparadoState(nombreEstado="Preparado")
         e_precintado = PrecintadoState(nombreEstado="Precintado")
-        e_transito = EnTransitoState(nombreEstado="En Transito")
+        e_transito = EnTransitoState(nombreEstado="En Tránsito")
+        e_recibido = RecibidoState(nombreEstado="Recibido")
         e_verificado = VerificadoState(nombreEstado="Verificado")
         e_rechazado = RechazadoState(nombreEstado="Rechazado")
-        db.add_all([e_preparado, e_precintado, e_transito, e_verificado, e_rechazado])
+        db.add_all([e_preparado, e_precintado, e_transito, e_recibido, e_verificado, e_rechazado])
         db.flush()
 
-        # 2. Centro de Distribucion UNICO
+        # 2. Centro de Distribución ÚNICO (1 fila)
         cd1 = CentroDistribucion(codigo="CD01", nombre="CD Central Buenos Aires", direccion="Av. Corrientes 1000", telefono="011-4000-0001", codigoOperativo="CD-BA-01")
         db.add(cd1)
 
@@ -42,7 +47,6 @@ def reset_and_seed():
         suc5 = Sucursal(codigo="SUC05", nombre="Sucursal Norte Cordoba", direccion="Av. Colon 5000", telefono="0351-400-0002", numeroSucursal=202, habilitadaVenta=True)
         suc6 = Sucursal(codigo="SUC06", nombre="Sucursal Cuyo Mendoza", direccion="Ruta 40 Km 12", telefono="0261-400-0003", numeroSucursal=401, habilitadaVenta=True)
         suc7 = Sucursal(codigo="SUC07", nombre="Sucursal Litoral Rosario", direccion="Av. Pellegrini 3000", telefono="0341-400-0004", numeroSucursal=302, habilitadaVenta=True)
-        
         db.add_all([suc1, suc2, suc3, suc4, suc5, suc6, suc7])
         db.flush()
 
@@ -53,7 +57,7 @@ def reset_and_seed():
         prov4 = Proveedor(cuit="30-44444444-8", razonSocial="Importadora Global Corp", telefonoContacto="0341-777-8888")
         db.add_all([prov1, prov2, prov3, prov4])
 
-        # 5. Categorias (4 filas)
+        # 5. Categorías (4 filas)
         cat1 = Categoria(nombre="Electronica", descripcion="Articulos tecnologicos y gadgetry")
         cat2 = Categoria(nombre="Indumentaria", descripcion="Ropa deportiva y formal")
         cat3 = Categoria(nombre="Hogar", descripcion="Muebles y electrodomesticos pequenos")
@@ -69,57 +73,105 @@ def reset_and_seed():
         db.add_all([p1, p2, p3, p4])
         db.flush()
 
-        # 7. StockItems (Asignaciones de Stock a Sucursales y al unico CD)
+        # 7. StockItems
         st1 = StockItem(cantidadDisponible=15, cantidadReservada=2, producto=p1, establecimiento=suc1)
         st2 = StockItem(cantidadDisponible=50, cantidadReservada=5, producto=p2, establecimiento=suc2)
         st3 = StockItem(cantidadDisponible=10, cantidadReservada=0, producto=p3, establecimiento=suc3)
-        st4 = StockItem(cantidadDisponible=100, cantidadReservada=10, producto=p4, establecimiento=cd1) # Stock en CD central
+        st4 = StockItem(cantidadDisponible=100, cantidadReservada=10, producto=p4, establecimiento=cd1)
         st5 = StockItem(cantidadDisponible=25, cantidadReservada=0, producto=p1, establecimiento=suc5)
         db.add_all([st1, st2, st3, st4, st5])
 
-        # 8. Ordenes de Reposicion (Todas parten del unico CD Central cd1)
-        ord1 = OrdenReposicion(numeroOrden="ORD-2026-001", fechaSolicitud=datetime.utcnow() - timedelta(days=5), estado="DESPACHADA", origen=cd1, destino=suc1)
-        ord2 = OrdenReposicion(numeroOrden="ORD-2026-002", fechaSolicitud=datetime.utcnow() - timedelta(days=3), estado="EN_TRANSITO", origen=cd1, destino=suc3)
-        ord3 = OrdenReposicion(numeroOrden="ORD-2026-003", fechaSolicitud=datetime.utcnow() - timedelta(days=1), estado="CREADA", origen=cd1, destino=suc2)
-        ord4 = OrdenReposicion(numeroOrden="ORD-2026-004", fechaSolicitud=datetime.utcnow(), estado="CREADA", origen=cd1, destino=suc7)
+        # 8. Órdenes de Reposición
+        ahora = ahora_gmt3()
+        ord1 = OrdenReposicion(numeroOrden="ORD-2026-001", fechaSolicitud=ahora - timedelta(days=5), origen=cd1, destino=suc1)
+        ord2 = OrdenReposicion(numeroOrden="ORD-2026-002", fechaSolicitud=ahora - timedelta(days=3), origen=cd1, destino=suc3)
+        ord3 = OrdenReposicion(numeroOrden="ORD-2026-003", fechaSolicitud=ahora - timedelta(days=1), origen=cd1, destino=suc2)
+        ord4 = OrdenReposicion(numeroOrden="ORD-2026-004", fechaSolicitud=ahora, origen=cd1, destino=suc7)
         db.add_all([ord1, ord2, ord3, ord4])
         db.flush()
 
-        # 9. Detalles de Orden (4 filas)
+        # 9. Detalles de Orden
         do1 = DetalleOrden(cantidadSolicitada=10, orden=ord1, producto=p1)
         do2 = DetalleOrden(cantidadSolicitada=30, orden=ord2, producto=p2)
         do3 = DetalleOrden(cantidadSolicitada=15, orden=ord3, producto=p3)
         do4 = DetalleOrden(cantidadSolicitada=80, orden=ord4, producto=p4)
         db.add_all([do1, do2, do3, do4])
 
-        # 10. Remitos (Todos despachados desde el unico CD Central cd1)
-        rem1 = Remito(numeroRemito="REM-001-0001", fechaEmision=datetime.utcnow() - timedelta(days=4), origen=cd1, destino=suc1)
-        rem2 = Remito(numeroRemito="REM-001-0002", fechaEmision=datetime.utcnow() - timedelta(days=2), origen=cd1, destino=suc3)
-        rem3 = Remito(numeroRemito="REM-001-0003", fechaEmision=datetime.utcnow() - timedelta(days=1), origen=cd1, destino=suc2)
-        rem4 = Remito(numeroRemito="REM-001-0004", fechaEmision=datetime.utcnow(), origen=cd1, destino=suc7)
+        # 10. Remitos
+        rem1 = Remito(
+            numeroRemito="REM-001-0001",
+            fechaEmision=ahora - timedelta(days=4),
+            fechaDespacho=ahora - timedelta(days=3, hours=12),
+            fechaRecepcion=ahora - timedelta(days=2, hours=4),
+            origen=cd1,
+            destino=suc1
+        )
+        rem2 = Remito(
+            numeroRemito="REM-001-0002",
+            fechaEmision=ahora - timedelta(days=2),
+            fechaDespacho=ahora - timedelta(days=1),
+            fechaRecepcion=None,
+            origen=cd1,
+            destino=suc3
+        )
+        rem3 = Remito(
+            numeroRemito="REM-001-0003",
+            fechaEmision=ahora - timedelta(days=1, hours=12),
+            fechaDespacho=ahora - timedelta(days=1),
+            fechaRecepcion=ahora - timedelta(hours=14),
+            origen=cd1,
+            destino=suc2
+        )
+        rem4 = Remito(
+            numeroRemito="REM-001-0004",
+            fechaEmision=ahora - timedelta(hours=2),
+            fechaDespacho=None,
+            fechaRecepcion=None,
+            origen=cd1,
+            destino=suc7
+        )
         db.add_all([rem1, rem2, rem3, rem4])
         db.flush()
 
-        # 11. Bultos (4 filas)
+        # 11. Bultos
         b1 = Bulto(codigoBulto="BUL-1001", codigoPrecinto="PREC-A1", precintoIntacto=True, remito=rem1, estadoActual=e_verificado)
         b2 = Bulto(codigoBulto="BUL-1002", codigoPrecinto="PREC-A2", precintoIntacto=True, remito=rem2, estadoActual=e_transito)
         b3 = Bulto(codigoBulto="BUL-1003", codigoPrecinto="PREC-A3", precintoIntacto=False, remito=rem3, estadoActual=e_rechazado)
-        b4 = Bulto(codigoBulto="BUL-1004", codigoPrecinto="PREC-A4", precintoIntacto=True, remito=rem4, estadoActual=e_preparado)
+        b4 = Bulto(codigoBulto="BUL-1004", codigoPrecinto="", precintoIntacto=True, remito=rem4, estadoActual=e_preparado)
         db.add_all([b1, b2, b3, b4])
         db.flush()
 
-        # 12. Historial de Cambios de Estado (4 filas)
-        ce1 = CambioEstado(fechaHoraInicio=datetime.utcnow() - timedelta(days=4), esActual=False, esInicial=True, bulto=b1, estado=e_preparado)
-        ce2 = CambioEstado(fechaHoraInicio=datetime.utcnow() - timedelta(days=2), esActual=True, esInicial=False, bulto=b1, estado=e_verificado)
-        ce3 = CambioEstado(fechaHoraInicio=datetime.utcnow() - timedelta(days=1), esActual=True, esInicial=False, bulto=b2, estado=e_transito)
-        ce4 = CambioEstado(fechaHoraInicio=datetime.utcnow() - timedelta(hours=12), esActual=True, esInicial=False, bulto=b3, estado=e_rechazado)
-        db.add_all([ce1, ce2, ce3, ce4])
+        # 12. Historial Completo de Cambios de Estado (Trazabilidad completa hasta el estado actual)
+        historial_completo = [
+            # --- BUL-1001 (Estado actual: Verificado) ---
+            CambioEstado(fechaHoraInicio=ahora - timedelta(days=4), fechaHoraFin=ahora - timedelta(days=3, hours=18), esActual=False, esInicial=True, bulto=b1, estado=e_preparado),
+            CambioEstado(fechaHoraInicio=ahora - timedelta(days=3, hours=18), fechaHoraFin=ahora - timedelta(days=3, hours=12), esActual=False, esInicial=False, bulto=b1, estado=e_precintado),
+            CambioEstado(fechaHoraInicio=ahora - timedelta(days=3, hours=12), fechaHoraFin=ahora - timedelta(days=2, hours=4), esActual=False, esInicial=False, bulto=b1, estado=e_transito),
+            CambioEstado(fechaHoraInicio=ahora - timedelta(days=2, hours=4), fechaHoraFin=ahora - timedelta(days=2), esActual=False, esInicial=False, bulto=b1, estado=e_recibido),
+            CambioEstado(fechaHoraInicio=ahora - timedelta(days=2), fechaHoraFin=None, esActual=True, esInicial=False, bulto=b1, estado=e_verificado),
+
+            # --- BUL-1002 (Estado actual: En Tránsito) ---
+            CambioEstado(fechaHoraInicio=ahora - timedelta(days=2), fechaHoraFin=ahora - timedelta(days=1, hours=12), esActual=False, esInicial=True, bulto=b2, estado=e_preparado),
+            CambioEstado(fechaHoraInicio=ahora - timedelta(days=1, hours=12), fechaHoraFin=ahora - timedelta(days=1), esActual=False, esInicial=False, bulto=b2, estado=e_precintado),
+            CambioEstado(fechaHoraInicio=ahora - timedelta(days=1), fechaHoraFin=None, esActual=True, esInicial=False, bulto=b2, estado=e_transito),
+
+            # --- BUL-1003 (Estado actual: Rechazado) ---
+            CambioEstado(fechaHoraInicio=ahora - timedelta(days=1, hours=12), fechaHoraFin=ahora - timedelta(days=1, hours=6), esActual=False, esInicial=True, bulto=b3, estado=e_preparado),
+            CambioEstado(fechaHoraInicio=ahora - timedelta(days=1, hours=6), fechaHoraFin=ahora - timedelta(days=1), esActual=False, esInicial=False, bulto=b3, estado=e_precintado),
+            CambioEstado(fechaHoraInicio=ahora - timedelta(days=1), fechaHoraFin=ahora - timedelta(hours=14), esActual=False, esInicial=False, bulto=b3, estado=e_transito),
+            CambioEstado(fechaHoraInicio=ahora - timedelta(hours=14), fechaHoraFin=ahora - timedelta(hours=12), esActual=False, esInicial=False, bulto=b3, estado=e_recibido),
+            CambioEstado(fechaHoraInicio=ahora - timedelta(hours=12), fechaHoraFin=None, esActual=True, esInicial=False, bulto=b3, estado=e_rechazado),
+
+            # --- BUL-1004 (Estado actual: Preparado) ---
+            CambioEstado(fechaHoraInicio=ahora - timedelta(hours=2), fechaHoraFin=None, esActual=True, esInicial=True, bulto=b4, estado=e_preparado),
+        ]
+        db.add_all(historial_completo)
 
         # 13. Ventas (4 filas)
-        v1 = Venta(numeroComprobante="FAC-001-0001", fechaHora=datetime.utcnow() - timedelta(days=2), total=475000.0, sucursal=suc1)
-        v2 = Venta(numeroComprobante="FAC-001-0002", fechaHora=datetime.utcnow() - timedelta(days=1), total=25000.0, sucursal=suc1)
-        v3 = Venta(numeroComprobante="FAC-002-0001", fechaHora=datetime.utcnow() - timedelta(hours=5), total=120000.0, sucursal=suc2)
-        v4 = Venta(numeroComprobante="FAC-003-0001", fechaHora=datetime.utcnow(), total=17000.0, sucursal=suc3)
+        v1 = Venta(numeroComprobante="FAC-001-0001", fechaHora=ahora - timedelta(days=2), total=475000.0, sucursal=suc1)
+        v2 = Venta(numeroComprobante="FAC-001-0002", fechaHora=ahora - timedelta(days=1), total=25000.0, sucursal=suc1)
+        v3 = Venta(numeroComprobante="FAC-002-0001", fechaHora=ahora - timedelta(hours=5), total=120000.0, sucursal=suc2)
+        v4 = Venta(numeroComprobante="FAC-003-0001", fechaHora=ahora, total=17000.0, sucursal=suc3)
         db.add_all([v1, v2, v3, v4])
         db.flush()
 
@@ -138,14 +190,14 @@ def reset_and_seed():
         db.add_all([mp1, mp2, mp3, mp4])
 
         # 16. Devoluciones (4 filas)
-        dev1 = Devolucion(fechaHora=datetime.utcnow() - timedelta(days=1), motivo="Producto defectuoso de fabrica", montoDevuelto=450000.0, venta=v1)
-        dev2 = Devolucion(fechaHora=datetime.utcnow() - timedelta(hours=10), motivo="Talle incorrecto", montoDevuelto=25000.0, venta=v2)
-        dev3 = Devolucion(fechaHora=datetime.utcnow() - timedelta(hours=2), motivo="Empaque danado", montoDevuelto=120000.0, venta=v3)
-        dev4 = Devolucion(fechaHora=datetime.utcnow(), motivo="Arrepentimiento de compra", montoDevuelto=17000.0, venta=v4)
+        dev1 = Devolucion(fechaHora=ahora - timedelta(days=1), motivo="Producto defectuoso de fabrica", montoDevuelto=450000.0, venta=v1)
+        dev2 = Devolucion(fechaHora=ahora - timedelta(hours=10), motivo="Talle incorrecto", montoDevuelto=25000.0, venta=v2)
+        dev3 = Devolucion(fechaHora=ahora - timedelta(hours=2), motivo="Empaque danado", montoDevuelto=120000.0, venta=v3)
+        dev4 = Devolucion(fechaHora=ahora, motivo="Arrepentimiento de compra", montoDevuelto=17000.0, venta=v4)
         db.add_all([dev1, dev2, dev3, dev4])
 
         db.commit()
-        print("Sembrado completado con exito! Se cargaron 1 Centro de Distribucion y 7 Sucursales en datos.sqlite3.")
+        print("Sembrado completado con exito!")
 
     except Exception as e:
         db.rollback()
