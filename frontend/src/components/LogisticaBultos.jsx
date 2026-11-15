@@ -517,7 +517,6 @@ export default function LogisticaBultos({ ambito, centroDistribucion, idSucursal
                                   <thead>
                                     <tr>
                                       <th>ID Cambio</th>
-                                      <th>Nro. OR</th>
                                       <th>Estado</th>
                                       <th>Tipo (State)</th>
                                       <th>Fecha y Hora Inicio (GMT-3)</th>
@@ -530,7 +529,6 @@ export default function LogisticaBultos({ ambito, centroDistribucion, idSucursal
                                     {historial.map(ce => (
                                       <tr key={ce.idCambioEstado} style={{ fontWeight: ce.esActual ? 'bold' : 'normal' }}>
                                         <td className="muted">{ce.idCambioEstado}</td>
-                                        <td className="strong">{ce.numeroOrden || b.numeroOrden}</td>
                                         <td>{ce.estado}</td>
                                         <td><code>{ce.tipoEstado}</code></td>
                                         <td>{ce.fechaHoraInicio}</td>

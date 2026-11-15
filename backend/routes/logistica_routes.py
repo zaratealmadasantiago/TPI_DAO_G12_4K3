@@ -78,8 +78,7 @@ def reintegrar_stock_cd(db, bulto):
             nuevo_stock = StockItem(
                 idEstablecimiento=id_cd_origen,
                 idProducto=det.idProducto,
-                cantidadDisponible=det.cantidadSolicitada,
-                cantidadReservada=0
+                cantidadDisponible=det.cantidadSolicitada
             )
             db.add(nuevo_stock)
 
@@ -498,8 +497,7 @@ def acreditar_stock_sucursal(db, bulto):
             nuevo_stock = StockItem(
                 idEstablecimiento=id_sucursal,
                 idProducto=det.idProducto,
-                cantidadDisponible=det.cantidadSolicitada,
-                cantidadReservada=0
+                cantidadDisponible=det.cantidadSolicitada
             )
             db.add(nuevo_stock)
 
@@ -542,8 +540,7 @@ def verificar_precinto_bulto(id_bulto):
                             db.add(StockItem(
                                 idEstablecimiento=bulto.remito.idDestino,
                                 idProducto=det.idProducto,
-                                cantidadDisponible=det.cantidadSolicitada,
-                                cantidadReservada=0
+                                cantidadDisponible=det.cantidadSolicitada
                             ))
 
             db.commit()

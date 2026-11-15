@@ -4,7 +4,7 @@ from models import Producto, Categoria, Proveedor, Sucursal, CentroDistribucion,
 
 catalogo_bp = Blueprint('catalogo', __name__, url_prefix='/api/v1/catalogo')
 
-# --- PRODUCTOS (ABM) ---
+# --- PRODUCTOS (ABM + HABILITAR/DESHABILITAR) ---
 @catalogo_bp.route('/productos', methods=['GET'])
 def listar_productos():
     db = SessionLocal()
@@ -17,12 +17,15 @@ def listar_productos():
             "precioVenta": p.precioVenta,
             "costoUnitario": p.costoUnitario,
             "stockMinimo": p.stockMinimo,
+            "esActivo": bool(p.esActivo) if p.esActivo is not None else True,
             "idCategoria": p.idCategoria,
+            "categoriaNombre": p.categoria.nombre if p.categoria else "Sin categoría",
             "idProveedor": p.idProveedor
         } for p in productos]
         return jsonify({"status": "success", "datos": resultado}), 200
     finally:
         db.close()
+
 
 @catalogo_bp.route('/productos', methods=['POST'])
 def crear_producto():
@@ -30,17 +33,49 @@ def crear_producto():
     db = SessionLocal()
     try:
         nuevo_p = Producto(
-            codigoBarras=data['codigoBarras'],
-            nombre=data['nombre'],
+            codigoBarras=str(data['codigoBarras']).strip(),
+            nombre=str(data['nombre']).strip(),
             precioVenta=float(data['precioVenta']),
             costoUnitario=float(data['costoUnitario']),
             stockMinimo=int(data.get('stockMinimo', 5)),
-            idCategoria=data.get('idCategoria', 1),
-            idProveedor=data.get('idProveedor', 1)
+            esActivo=True,
+            idCategoria=int(data.get('idCategoria', 1)),
+            idProveedor=int(data.get('idProveedor', 1))
         )
         db.add(nuevo_p)
         db.commit()
-        return jsonify({"status": "success", "mensaje": "Producto creado exitosamente", "idProducto": nuevo_p.idProducto}), 201
+        return jsonify({
+            "status": "success",
+            "mensaje": "Producto creado exitosamente",
+            "idProducto": nuevo_p.idProducto
+        }), 201
+    except Exception as e:
+        db.rollback()
+        return jsonify({"status": "error", "mensaje": str(e)}), 400
+    finally:
+        db.close()
+
+
+@catalogo_bp.route('/productos/<int:id_producto>/estado', methods=['PATCH'])
+def cambiar_estado_producto(id_producto):
+    """Habilita o deshabilita un producto sin eliminarlo de la base de datos."""
+    data = request.json or {}
+    db = SessionLocal()
+    try:
+        p = db.query(Producto).get(id_producto)
+        if not p:
+            return jsonify({"status": "error", "mensaje": "Producto no encontrado"}), 404
+
+        nuevo_estado = bool(data.get('esActivo'))
+        p.esActivo = nuevo_estado
+        db.commit()
+
+        accion_txt = "habilitado" if nuevo_estado else "deshabilitado"
+        return jsonify({
+            "status": "success",
+            "mensaje": f"Producto '{p.nombre}' {accion_txt} correctamente.",
+            "esActivo": p.esActivo
+        }), 200
     except Exception as e:
         db.rollback()
         return jsonify({"status": "error", "mensaje": str(e)}), 400
@@ -196,7 +231,6 @@ def listar_stock():
         resultado = [{
             "idStockItem": s.idStockItem,
             "cantidadDisponible": s.cantidadDisponible,
-            "cantidadReservada": s.cantidadReservada,
             "idProducto": s.idProducto,
             "productoNombre": s.producto.nombre if s.producto else None,
             "idEstablecimiento": s.idEstablecimiento,
@@ -233,7 +267,6 @@ def obtener_stock_establecimiento(id_establecimiento):
                     "costoUnitario": p.costoUnitario,
                     "stockMinimo": p.stockMinimo,
                     "cantidadDisponible": s.cantidadDisponible,
-                    "cantidadReservada": s.cantidadReservada
                 })
 
         return jsonify({
@@ -252,37 +285,42 @@ def obtener_stock_establecimiento(id_establecimiento):
 
 @catalogo_bp.route('/establecimientos/<int:id_establecimiento>/stock', methods=['POST'])
 def agregar_o_actualizar_stock_establecimiento(id_establecimiento):
-    """
-    Agrega un producto al stock de un establecimiento puntual o actualiza su cantidad disponible.
-    """
     data = request.json
     id_producto = data.get('idProducto')
     cantidad = int(data.get('cantidadDisponible', 0))
 
+    if cantidad <= 0:
+        return jsonify({"status": "error", "mensaje": "La cantidad debe ser mayor a 0."}), 400
+
     db = SessionLocal()
     try:
-        # Verificar que el establecimiento exista
         est = db.query(Establecimiento).get(id_establecimiento)
         if not est:
             return jsonify({"status": "error", "mensaje": "Establecimiento no encontrado"}), 404
 
-        # Buscar si ya existe el StockItem para este producto y establecimiento
+        prod = db.query(Producto).get(id_producto)
+        if not prod:
+            return jsonify({"status": "error", "mensaje": "Producto no encontrado"}), 404
+
+        if prod.esActivo is False:
+            return jsonify({
+                "status": "error",
+                "mensaje": f"El producto '{prod.nombre}' está DESHABILITADO. Habilítelo antes de asignar unidades."
+            }), 400
+
         stock_item = db.query(StockItem).filter(
             StockItem.idEstablecimiento == id_establecimiento,
             StockItem.idProducto == id_producto
         ).first()
 
         if stock_item:
-            # Si existe, actualizamos la cantidad disponible
             stock_item.cantidadDisponible = cantidad
             mensaje = "Stock actualizado correctamente"
         else:
-            # Si no existe, creamos una nueva asignación de StockItem
             stock_item = StockItem(
                 idEstablecimiento=id_establecimiento,
                 idProducto=id_producto,
-                cantidadDisponible=cantidad,
-                cantidadReservada=0
+                cantidadDisponible=cantidad
             )
             db.add(stock_item)
             mensaje = "Producto asignado al establecimiento correctamente con su stock inicial"

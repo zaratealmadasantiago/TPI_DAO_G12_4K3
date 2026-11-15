@@ -20,6 +20,18 @@ export const apiService = {
     });
     return res.json();
   },
+  cambiarEstadoProducto: async (idProducto, esActivo) => {
+    const res = await fetch(`${API_BASE_URL}/catalogo/productos/${idProducto}/estado`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ esActivo }),
+    });
+    return res.json();
+  },
+  getCategorias: async () => {
+    const res = await fetch(`${API_BASE_URL}/catalogo/categorias`);
+    return res.json();
+  },
 
   // --- Logística: Órdenes de Reposición ---
   getOrdenesReposicion: async (params = {}) => {

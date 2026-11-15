@@ -67,7 +67,7 @@ class Producto(Base):
     precioVenta = Column(Float, nullable=False)
     costoUnitario = Column(Float, nullable=False)
     stockMinimo = Column(Integer, default=0)
-
+    esActivo = Column(Boolean, default=True)
     idCategoria = Column(Integer, ForeignKey('categorias.idCategoria'), nullable=True)
     idProveedor = Column(Integer, ForeignKey('proveedores.idProveedor'), nullable=True)
 
@@ -80,7 +80,6 @@ class StockItem(Base):
 
     idStockItem = Column(Integer, primary_key=True, autoincrement=True)
     cantidadDisponible = Column(Integer, default=0)
-    cantidadReservada = Column(Integer, default=0)
 
     idProducto = Column(Integer, ForeignKey('productos.idProducto'), nullable=False)
     idEstablecimiento = Column(Integer, ForeignKey('establecimientos.idEstablecimiento'), nullable=False)
