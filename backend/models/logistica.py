@@ -8,12 +8,19 @@ GMT_MINUS_3 = timezone(timedelta(hours=-3))
 def ahora_gmt3():
     return datetime.now(GMT_MINUS_3).replace(tzinfo=None)
 
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey
+from sqlalchemy.orm import relationship
+from datetime import datetime
+from models.base import Base
+
+
 class OrdenReposicion(Base):
     __tablename__ = 'ordenes_reposicion'
 
     idOrden = Column(Integer, primary_key=True, autoincrement=True)
     numeroOrden = Column(String(50), nullable=False, unique=True)
-    fechaSolicitud = Column(DateTime, default=ahora_gmt3)
+    fechaSolicitud = Column(DateTime, default=datetime.utcnow)
+    estado = Column(String(50), default="CREADA")
 
     idOrigen = Column(Integer, ForeignKey('centros_distribucion.idEstablecimiento'), nullable=False)
     idDestino = Column(Integer, ForeignKey('sucursales.idEstablecimiento'), nullable=False)
@@ -21,6 +28,8 @@ class OrdenReposicion(Base):
     origen = relationship("CentroDistribucion", foreign_keys=[idOrigen])
     destino = relationship("Sucursal", foreign_keys=[idDestino])
     detalles = relationship("DetalleOrden", back_populates="orden", cascade="all, delete-orphan")
+    remitos = relationship("Remito", back_populates="orden")
+
 
 class DetalleOrden(Base):
     __tablename__ = 'detalles_orden'
@@ -34,6 +43,7 @@ class DetalleOrden(Base):
     orden = relationship("OrdenReposicion", back_populates="detalles")
     producto = relationship("Producto")
 
+
 class Remito(Base):
     __tablename__ = 'remitos'
 
@@ -42,20 +52,24 @@ class Remito(Base):
     fechaEmision = Column(DateTime, default=datetime.utcnow)
     fechaDespacho = Column(DateTime, nullable=True)
     fechaRecepcion = Column(DateTime, nullable=True)
+    estado = Column(String(50), default="GENERADO", nullable=False)
 
+    idOrden = Column(Integer, ForeignKey('ordenes_reposicion.idOrden'), nullable=True)
     idOrigen = Column(Integer, ForeignKey('centros_distribucion.idEstablecimiento'), nullable=False)
     idDestino = Column(Integer, ForeignKey('sucursales.idEstablecimiento'), nullable=False)
 
+    orden = relationship("OrdenReposicion", back_populates="remitos")
     origen = relationship("CentroDistribucion", foreign_keys=[idOrigen])
     destino = relationship("Sucursal", foreign_keys=[idDestino])
     bultos = relationship("Bulto", back_populates="remito", cascade="all, delete-orphan")
+
 
 class Bulto(Base):
     __tablename__ = 'bultos'
 
     idBulto = Column(Integer, primary_key=True, autoincrement=True)
     codigoBulto = Column(String(50), nullable=False, unique=True)
-    codigoPrecinto = Column(String(50), nullable=False)
+    codigoPrecinto = Column(String(50), nullable=False, default="")
     precintoIntacto = Column(Boolean, default=True)
 
     idRemito = Column(Integer, ForeignKey('remitos.idRemito'), nullable=False)
@@ -63,9 +77,8 @@ class Bulto(Base):
 
     remito = relationship("Remito", back_populates="bultos")
     estadoActual = relationship("EstadoBulto", foreign_keys=[idEstadoActual])
-    
-    # Relación de trazabilidad con CambioEstado
     historialEstados = relationship("CambioEstado", back_populates="bulto", cascade="all, delete-orphan")
+
 
 class EstadoBulto(Base):
     __tablename__ = 'estados_bulto'
@@ -79,31 +92,36 @@ class EstadoBulto(Base):
         'polymorphic_on': tipo
     }
 
+
 class PreparadoState(EstadoBulto):
     __mapper_args__ = {'polymorphic_identity': 'preparado'}
+
 
 class PrecintadoState(EstadoBulto):
     __mapper_args__ = {'polymorphic_identity': 'precintado'}
 
+
 class EnTransitoState(EstadoBulto):
     __mapper_args__ = {'polymorphic_identity': 'en_transito'}
+
 
 class RecibidoState(EstadoBulto):
     __mapper_args__ = {'polymorphic_identity': 'recibido'}
 
+
 class VerificadoState(EstadoBulto):
     __mapper_args__ = {'polymorphic_identity': 'verificado'}
+
 
 class RechazadoState(EstadoBulto):
     __mapper_args__ = {'polymorphic_identity': 'rechazado'}
 
-# NUEVA ENTIDAD: Trazabilidad inmutable de transiciones de estado
+
 class CambioEstado(Base):
     __tablename__ = 'cambios_estado'
 
     idCambioEstado = Column(Integer, primary_key=True, autoincrement=True)
-    fechaHoraInicio = Column(DateTime, default=ahora_gmt3)
-    fechaHoraFin = Column(DateTime, nullable=True)
+    fechaHoraInicio = Column(DateTime, default=datetime.utcnow)
     esActual = Column(Boolean, default=True)
     esInicial = Column(Boolean, default=False)
 

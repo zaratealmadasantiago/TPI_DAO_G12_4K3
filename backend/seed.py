@@ -11,8 +11,10 @@ from models import (
 
 GMT_MINUS_3 = timezone(timedelta(hours=-3))
 
+
 def ahora_gmt3():
     return datetime.now(GMT_MINUS_3).replace(tzinfo=None)
+
 
 def reset_and_seed():
     print("Reseteando esquemas de la base de datos SQLite3...")
@@ -36,17 +38,23 @@ def reset_and_seed():
         db.flush()
 
         # 2. Centro de Distribución ÚNICO (1 fila)
-        cd1 = CentroDistribucion(codigo="CD01", nombre="CD Central Buenos Aires", direccion="Av. Corrientes 1000", telefono="011-4000-0001", codigoOperativo="CD-BA-01")
+        cd1 = CentroDistribucion(
+            codigo="CD01",
+            nombre="CD Central Buenos Aires",
+            direccion="Av. Corrientes 1000",
+            telefono="011-4000-0001",
+            codigoOperativo="CD-BA-01"
+        )
         db.add(cd1)
 
         # 3. Sucursales (7 filas)
         suc1 = Sucursal(codigo="SUC01", nombre="Sucursal Palermo", direccion="Av. Santa Fe 2500", telefono="011-5000-0001", numeroSucursal=101, habilitadaVenta=True)
         suc2 = Sucursal(codigo="SUC02", nombre="Sucursal Belgrano", direccion="Av. Cabildo 1800", telefono="011-5000-0002", numeroSucursal=102, habilitadaVenta=True)
-        suc3 = Sucursal(codigo="SUC03", nombre="Sucursal Cordoba Centro", direccion="Peatonal San Martin 150", telefono="0351-500-0003", numeroSucursal=201, habilitadaVenta=True)
-        suc4 = Sucursal(codigo="SUC04", nombre="Sucursal Rosario Centro", direccion="Peatonal Cordoba 800", telefono="0341-500-0004", numeroSucursal=301, habilitadaVenta=True)
-        suc5 = Sucursal(codigo="SUC05", nombre="Sucursal Norte Cordoba", direccion="Av. Colon 5000", telefono="0351-400-0002", numeroSucursal=202, habilitadaVenta=True)
-        suc6 = Sucursal(codigo="SUC06", nombre="Sucursal Cuyo Mendoza", direccion="Ruta 40 Km 12", telefono="0261-400-0003", numeroSucursal=401, habilitadaVenta=True)
-        suc7 = Sucursal(codigo="SUC07", nombre="Sucursal Litoral Rosario", direccion="Av. Pellegrini 3000", telefono="0341-400-0004", numeroSucursal=302, habilitadaVenta=True)
+        suc3 = Sucursal(codigo="SUC03", nombre="Sucursal Cordoba Centro", direccion="Peatonal San Martin 150", telefono="0351-5000-0003", numeroSucursal=201, habilitadaVenta=True)
+        suc4 = Sucursal(codigo="SUC04", nombre="Sucursal Rosario Centro", direccion="Peatonal Cordoba 800", telefono="0341-5000-0004", numeroSucursal=301, habilitadaVenta=True)
+        suc5 = Sucursal(codigo="SUC05", nombre="Sucursal Norte Cordoba", direccion="Av. Colon 5000", telefono="0351-4000-0002", numeroSucursal=202, habilitadaVenta=True)
+        suc6 = Sucursal(codigo="SUC06", nombre="Sucursal Cuyo Mendoza", direccion="Ruta 40 Km 12", telefono="0261-4000-0003", numeroSucursal=401, habilitadaVenta=True)
+        suc7 = Sucursal(codigo="SUC07", nombre="Sucursal Litoral Rosario", direccion="Av. Pellegrini 3000", telefono="0341-4000-0004", numeroSucursal=302, habilitadaVenta=True)
         db.add_all([suc1, suc2, suc3, suc4, suc5, suc6, suc7])
         db.flush()
 
@@ -73,36 +81,79 @@ def reset_and_seed():
         db.add_all([p1, p2, p3, p4])
         db.flush()
 
-        # 7. StockItems
-        st1 = StockItem(cantidadDisponible=15, cantidadReservada=2, producto=p1, establecimiento=suc1)
+        # 7. StockItems (Sucursales + Stock disponible en el CD para evaluar/aprobar ORs)
+        st1 = StockItem(cantidadDisponible=25, cantidadReservada=2, producto=p1, establecimiento=suc1)
         st2 = StockItem(cantidadDisponible=50, cantidadReservada=5, producto=p2, establecimiento=suc2)
         st3 = StockItem(cantidadDisponible=10, cantidadReservada=0, producto=p3, establecimiento=suc3)
-        st4 = StockItem(cantidadDisponible=100, cantidadReservada=10, producto=p4, establecimiento=cd1)
-        st5 = StockItem(cantidadDisponible=25, cantidadReservada=0, producto=p1, establecimiento=suc5)
-        db.add_all([st1, st2, st3, st4, st5])
+        st4 = StockItem(cantidadDisponible=150, cantidadReservada=10, producto=p4, establecimiento=cd1)
+        st5 = StockItem(cantidadDisponible=45, cantidadReservada=0, producto=p3, establecimiento=cd1)
+        st6 = StockItem(cantidadDisponible=30, cantidadReservada=0, producto=p1, establecimiento=cd1)
+        st7 = StockItem(cantidadDisponible=120, cantidadReservada=0, producto=p2, establecimiento=cd1)
+        db.add_all([st1, st2, st3, st4, st5, st6, st7])
 
-        # 8. Órdenes de Reposición
-        ahora = ahora_gmt3()
-        ord1 = OrdenReposicion(numeroOrden="ORD-2026-001", fechaSolicitud=ahora - timedelta(days=5), origen=cd1, destino=suc1)
-        ord2 = OrdenReposicion(numeroOrden="ORD-2026-002", fechaSolicitud=ahora - timedelta(days=3), origen=cd1, destino=suc3)
-        ord3 = OrdenReposicion(numeroOrden="ORD-2026-003", fechaSolicitud=ahora - timedelta(days=1), origen=cd1, destino=suc2)
-        ord4 = OrdenReposicion(numeroOrden="ORD-2026-004", fechaSolicitud=ahora, origen=cd1, destino=suc7)
-        db.add_all([ord1, ord2, ord3, ord4])
+        # 8. Órdenes de Reposición (Correlativas a los Remitos/Bultos + 2 Esperando Aprobación en CD)
+        ord1 = OrdenReposicion(
+            numeroOrden="ORD-2026-001",
+            fechaSolicitud=ahora - timedelta(days=5),
+            estado="Entregada",  # Correlativa con REM-001-0001 (DISPONIBLE) y BUL-1001 (Verificado)
+            origen=cd1,
+            destino=suc1
+        )
+        ord2 = OrdenReposicion(
+            numeroOrden="ORD-2026-002",
+            fechaSolicitud=ahora - timedelta(days=3),
+            estado="Confirmada",  # Correlativa con REM-001-0002 (GENERADO) y BUL-1002 (En Tránsito)
+            origen=cd1,
+            destino=suc3
+        )
+        ord3 = OrdenReposicion(
+            numeroOrden="ORD-2026-003",
+            fechaSolicitud=ahora - timedelta(days=2),
+            estado="Rechazada",  # Correlativa con REM-001-0003 (RECHAZADO) y BUL-1003 (Rechazado)
+            origen=cd1,
+            destino=suc2
+        )
+        ord4 = OrdenReposicion(
+            numeroOrden="ORD-2026-004",
+            fechaSolicitud=ahora - timedelta(hours=4),
+            estado="Confirmada",  # Correlativa con REM-001-0004 (GENERADO) y BUL-1004 (Preparado)
+            origen=cd1,
+            destino=suc7
+        )
+        ord5 = OrdenReposicion(
+            numeroOrden="ORD-2026-005",
+            fechaSolicitud=ahora - timedelta(hours=1),
+            estado="Esperando Aprobación",  # Pendiente de aprobar en CD
+            origen=cd1,
+            destino=suc4
+        )
+        ord6 = OrdenReposicion(
+            numeroOrden="ORD-2026-006",
+            fechaSolicitud=ahora,
+            estado="Esperando Aprobación",  # Pendiente de aprobar en CD
+            origen=cd1,
+            destino=suc6
+        )
+        db.add_all([ord1, ord2, ord3, ord4, ord5, ord6])
         db.flush()
 
-        # 9. Detalles de Orden
+        # 9. Detalles de Orden (Cada OR tiene sus propios productos que viajan en su Remito/Bulto)
         do1 = DetalleOrden(cantidadSolicitada=10, orden=ord1, producto=p1)
         do2 = DetalleOrden(cantidadSolicitada=30, orden=ord2, producto=p2)
         do3 = DetalleOrden(cantidadSolicitada=15, orden=ord3, producto=p3)
         do4 = DetalleOrden(cantidadSolicitada=80, orden=ord4, producto=p4)
-        db.add_all([do1, do2, do3, do4])
+        do5 = DetalleOrden(cantidadSolicitada=20, orden=ord5, producto=p3)
+        do6 = DetalleOrden(cantidadSolicitada=40, orden=ord6, producto=p4)
+        db.add_all([do1, do2, do3, do4, do5, do6])
 
-        # 10. Remitos
+        # 10. Remitos (4 filas - cada uno vinculado exactamente a su OR y mismo destino)
         rem1 = Remito(
             numeroRemito="REM-001-0001",
             fechaEmision=ahora - timedelta(days=4),
             fechaDespacho=ahora - timedelta(days=3, hours=12),
             fechaRecepcion=ahora - timedelta(days=2, hours=4),
+            estado="DISPONIBLE",
+            orden=ord1,
             origen=cd1,
             destino=suc1
         )
@@ -111,6 +162,8 @@ def reset_and_seed():
             fechaEmision=ahora - timedelta(days=2),
             fechaDespacho=ahora - timedelta(days=1),
             fechaRecepcion=None,
+            estado="GENERADO",
+            orden=ord2,
             origen=cd1,
             destino=suc3
         )
@@ -119,6 +172,8 @@ def reset_and_seed():
             fechaEmision=ahora - timedelta(days=1, hours=12),
             fechaDespacho=ahora - timedelta(days=1),
             fechaRecepcion=ahora - timedelta(hours=14),
+            estado="RECHAZADO",
+            orden=ord3,
             origen=cd1,
             destino=suc2
         )
@@ -127,13 +182,15 @@ def reset_and_seed():
             fechaEmision=ahora - timedelta(hours=2),
             fechaDespacho=None,
             fechaRecepcion=None,
+            estado="GENERADO",
+            orden=ord4,
             origen=cd1,
             destino=suc7
         )
         db.add_all([rem1, rem2, rem3, rem4])
         db.flush()
 
-        # 11. Bultos
+        # 11. Bultos (4 filas - correlativos con sus Remitos y ORs)
         b1 = Bulto(codigoBulto="BUL-1001", codigoPrecinto="PREC-A1", precintoIntacto=True, remito=rem1, estadoActual=e_verificado)
         b2 = Bulto(codigoBulto="BUL-1002", codigoPrecinto="PREC-A2", precintoIntacto=True, remito=rem2, estadoActual=e_transito)
         b3 = Bulto(codigoBulto="BUL-1003", codigoPrecinto="PREC-A3", precintoIntacto=False, remito=rem3, estadoActual=e_rechazado)
@@ -141,29 +198,29 @@ def reset_and_seed():
         db.add_all([b1, b2, b3, b4])
         db.flush()
 
-        # 12. Historial Completo de Cambios de Estado (Trazabilidad completa hasta el estado actual)
+        # 12. Historial Completo de Cambios de Estado
         historial_completo = [
-            # --- BUL-1001 (Estado actual: Verificado) ---
-            CambioEstado(fechaHoraInicio=ahora - timedelta(days=4), fechaHoraFin=ahora - timedelta(days=3, hours=18), esActual=False, esInicial=True, bulto=b1, estado=e_preparado),
-            CambioEstado(fechaHoraInicio=ahora - timedelta(days=3, hours=18), fechaHoraFin=ahora - timedelta(days=3, hours=12), esActual=False, esInicial=False, bulto=b1, estado=e_precintado),
-            CambioEstado(fechaHoraInicio=ahora - timedelta(days=3, hours=12), fechaHoraFin=ahora - timedelta(days=2, hours=4), esActual=False, esInicial=False, bulto=b1, estado=e_transito),
-            CambioEstado(fechaHoraInicio=ahora - timedelta(days=2, hours=4), fechaHoraFin=ahora - timedelta(days=2), esActual=False, esInicial=False, bulto=b1, estado=e_recibido),
-            CambioEstado(fechaHoraInicio=ahora - timedelta(days=2), fechaHoraFin=None, esActual=True, esInicial=False, bulto=b1, estado=e_verificado),
+            # --- BUL-1001 (OR: ORD-2026-001 [Entregada] | Remito: REM-001-0001 [DISPONIBLE]) ---
+            CambioEstado(fechaHoraInicio=ahora - timedelta(days=4), esActual=False, esInicial=True, bulto=b1, estado=e_preparado),
+            CambioEstado(fechaHoraInicio=ahora - timedelta(days=3, hours=18), esActual=False, esInicial=False, bulto=b1, estado=e_precintado),
+            CambioEstado(fechaHoraInicio=ahora - timedelta(days=3, hours=12), esActual=False, esInicial=False, bulto=b1, estado=e_transito),
+            CambioEstado(fechaHoraInicio=ahora - timedelta(days=2, hours=4), esActual=False, esInicial=False, bulto=b1, estado=e_recibido),
+            CambioEstado(fechaHoraInicio=ahora - timedelta(days=2), esActual=True, esInicial=False, bulto=b1, estado=e_verificado),
 
-            # --- BUL-1002 (Estado actual: En Tránsito) ---
-            CambioEstado(fechaHoraInicio=ahora - timedelta(days=2), fechaHoraFin=ahora - timedelta(days=1, hours=12), esActual=False, esInicial=True, bulto=b2, estado=e_preparado),
-            CambioEstado(fechaHoraInicio=ahora - timedelta(days=1, hours=12), fechaHoraFin=ahora - timedelta(days=1), esActual=False, esInicial=False, bulto=b2, estado=e_precintado),
-            CambioEstado(fechaHoraInicio=ahora - timedelta(days=1), fechaHoraFin=None, esActual=True, esInicial=False, bulto=b2, estado=e_transito),
+            # --- BUL-1002 (OR: ORD-2026-002 [Confirmada] | Remito: REM-001-0002 [GENERADO]) ---
+            CambioEstado(fechaHoraInicio=ahora - timedelta(days=2), esActual=False, esInicial=True, bulto=b2, estado=e_preparado),
+            CambioEstado(fechaHoraInicio=ahora - timedelta(days=1, hours=12), esActual=False, esInicial=False, bulto=b2, estado=e_precintado),
+            CambioEstado(fechaHoraInicio=ahora - timedelta(days=1), esActual=True, esInicial=False, bulto=b2, estado=e_transito),
 
-            # --- BUL-1003 (Estado actual: Rechazado) ---
-            CambioEstado(fechaHoraInicio=ahora - timedelta(days=1, hours=12), fechaHoraFin=ahora - timedelta(days=1, hours=6), esActual=False, esInicial=True, bulto=b3, estado=e_preparado),
-            CambioEstado(fechaHoraInicio=ahora - timedelta(days=1, hours=6), fechaHoraFin=ahora - timedelta(days=1), esActual=False, esInicial=False, bulto=b3, estado=e_precintado),
-            CambioEstado(fechaHoraInicio=ahora - timedelta(days=1), fechaHoraFin=ahora - timedelta(hours=14), esActual=False, esInicial=False, bulto=b3, estado=e_transito),
-            CambioEstado(fechaHoraInicio=ahora - timedelta(hours=14), fechaHoraFin=ahora - timedelta(hours=12), esActual=False, esInicial=False, bulto=b3, estado=e_recibido),
-            CambioEstado(fechaHoraInicio=ahora - timedelta(hours=12), fechaHoraFin=None, esActual=True, esInicial=False, bulto=b3, estado=e_rechazado),
+            # --- BUL-1003 (OR: ORD-2026-003 [Rechazada] | Remito: REM-001-0003 [RECHAZADO]) ---
+            CambioEstado(fechaHoraInicio=ahora - timedelta(days=1, hours=12), esActual=False, esInicial=True, bulto=b3, estado=e_preparado),
+            CambioEstado(fechaHoraInicio=ahora - timedelta(days=1, hours=6), esActual=False, esInicial=False, bulto=b3, estado=e_precintado),
+            CambioEstado(fechaHoraInicio=ahora - timedelta(days=1), esActual=False, esInicial=False, bulto=b3, estado=e_transito),
+            CambioEstado(fechaHoraInicio=ahora - timedelta(hours=14), esActual=False, esInicial=False, bulto=b3, estado=e_recibido),
+            CambioEstado(fechaHoraInicio=ahora - timedelta(hours=12), esActual=True, esInicial=False, bulto=b3, estado=e_rechazado),
 
-            # --- BUL-1004 (Estado actual: Preparado) ---
-            CambioEstado(fechaHoraInicio=ahora - timedelta(hours=2), fechaHoraFin=None, esActual=True, esInicial=True, bulto=b4, estado=e_preparado),
+            # --- BUL-1004 (OR: ORD-2026-004 [Confirmada] | Remito: REM-001-0004 [GENERADO]) ---
+            CambioEstado(fechaHoraInicio=ahora - timedelta(hours=2), esActual=True, esInicial=True, bulto=b4, estado=e_preparado),
         ]
         db.add_all(historial_completo)
 
@@ -204,6 +261,7 @@ def reset_and_seed():
         print(f"Error durante el sembrado de datos: {e}")
     finally:
         db.close()
+
 
 if __name__ == "__main__":
     reset_and_seed()

@@ -21,10 +21,42 @@ export const apiService = {
     return res.json();
   },
 
-  // --- Logística & Bultos (Patrón State) ---
-  getBultos: async (idSucursal) => {
-    const query = idSucursal ? `?idSucursal=${idSucursal}` : '';
-    const res = await fetch(`${API_BASE_URL}/logistica/bultos${query}`);
+  // --- Logística: Órdenes de Reposición ---
+  getOrdenesReposicion: async (params = {}) => {
+    const query = new URLSearchParams();
+    if (params.idSucursal) query.append('idSucursal', params.idSucursal);
+    if (params.idCentroDistribucion) query.append('idCentroDistribucion', params.idCentroDistribucion);
+    if (params.soloPendientes) query.append('soloPendientes', '1');
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    const res = await fetch(`${API_BASE_URL}/logistica/ordenes-reposicion${qs}`);
+    return res.json();
+  },
+  crearOrdenReposicion: async (idDestino, detalles) => {
+    const res = await fetch(`${API_BASE_URL}/logistica/ordenes-reposicion`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idDestino, detalles }),
+    });
+    return res.json();
+  },
+  confirmarOrdenReposicion: async (idOrden) => {
+    const res = await fetch(`${API_BASE_URL}/logistica/ordenes-reposicion/${idOrden}/confirmar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    return res.json();
+  },
+  rechazarOrdenReposicion: async (idOrden) => {
+    const res = await fetch(`${API_BASE_URL}/logistica/ordenes-reposicion/${idOrden}/rechazar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    return res.json();
+  },
+
+  // --- Logística: Remitos & Bultos (Patrón State) ---
+  getBultos: async () => {
+    const res = await fetch(`${API_BASE_URL}/logistica/bultos`);
     return res.json();
   },
   asignarPrecinto: async (idBulto, codigoPrecinto) => {
@@ -61,21 +93,6 @@ export const apiService = {
     const res = await fetch(`${API_BASE_URL}/logistica/bultos/${idBulto}/rechazar-violado`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-    });
-    return res.json();
-  },
-
-  // --- Logística: Órdenes de Reposición ---
-  getOrdenesReposicion: async (idSucursal) => {
-    const query = idSucursal ? `?idSucursal=${idSucursal}` : '';
-    const res = await fetch(`${API_BASE_URL}/logistica/ordenes-reposicion${query}`);
-    return res.json();
-  },
-  crearOrdenReposicion: async (idDestino, detalles) => {
-    const res = await fetch(`${API_BASE_URL}/logistica/ordenes-reposicion`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ idDestino, detalles }),
     });
     return res.json();
   },
