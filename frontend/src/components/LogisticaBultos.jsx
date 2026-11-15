@@ -187,324 +187,291 @@ export default function LogisticaBultos({ idSucursal, sucursalActual }) {
   };
 
   return (
-    <div style={{ position: 'relative' }}>
-      <h3>
+    <section className="card" style={{ position: 'relative' }}>
+      <h3 className="card-title">
         Remitos y Trazabilidad de Bultos (Patrón State) —{' '}
         {sucursalActual ? sucursalActual.nombre : 'Seleccione una sucursal'}
       </h3>
-      
-      <table 
-        border="1" 
-        cellPadding="8" 
-        style={{ 
-          width: '100%', 
-          borderCollapse: 'collapse',
-          tableLayout: 'fixed'
-        }}
-      >
-        <thead>
-          <tr style={{ backgroundColor: '#f2f2f2' }}>
-            <th style={{ width: '7%' }}>ID Remito</th>
-            <th style={{ width: '11%' }}>Nro. Remito</th>
-            <th style={{ width: '8%' }}>ID Bulto</th>
-            <th style={{ width: '10%' }}>Código Bulto</th>
-            <th style={{ width: '19%' }}>Origen &rarr; Destino</th>
-            <th style={{ width: '10%' }}>Estado Actual</th>
-            <th style={{ width: '17%', minWidth: '185px' }}>Precinto Ingresado</th>
-            <th style={{ width: '18%', minWidth: '195px' }}>Acción</th>
-          </tr>
-        </thead>
-        <tbody>
-          {bultos.length === 0 ? (
+
+      <div className="table-wrap">
+        <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
+          <thead>
             <tr>
-              <td colSpan="8" style={{ textAlign: 'center', color: '#777', padding: '16px' }}>
-                No hay remitos/bultos con destino a esta sucursal.
-              </td>
+              <th style={{ width: '7%' }}>ID Remito</th>
+              <th style={{ width: '11%' }}>Nro. Remito</th>
+              <th style={{ width: '8%' }}>ID Bulto</th>
+              <th style={{ width: '10%' }}>Código Bulto</th>
+              <th style={{ width: '19%' }}>Origen &rarr; Destino</th>
+              <th style={{ width: '10%' }}>Estado Actual</th>
+              <th style={{ width: '17%', minWidth: '185px' }}>Precinto Ingresado</th>
+              <th style={{ width: '18%', minWidth: '195px' }} className="right">Acción</th>
             </tr>
-          ) : (
-            bultos.map(b => {
-              const estado = (b.estadoActual || '').toLowerCase();
-              const estaExpandido = bultoExpandidoId === b.idBulto;
-              
-              const esPreparado = estado === 'preparado';
-              const esPrecintado = estado === 'precintado';
-              const esEnTransito = estado === 'en tránsito' || estado === 'en transito';
-              const esRecibido = estado === 'recibido';
-              const esFinal = estado === 'verificado' || estado === 'rechazado';
+          </thead>
+          <tbody>
+            {bultos.length === 0 ? (
+              <tr>
+                <td colSpan="8" className="empty">
+                  No hay remitos/bultos con destino a esta sucursal.
+                </td>
+              </tr>
+            ) : (
+              bultos.map(b => {
+                const estado = (b.estadoActual || '').toLowerCase();
+                const estaExpandido = bultoExpandidoId === b.idBulto;
+                
+                const esPreparado = estado === 'preparado';
+                const esPrecintado = estado === 'precintado';
+                const esEnTransito = estado === 'en tránsito' || estado === 'en transito';
+                const esRecibido = estado === 'recibido';
+                const esFinal = estado === 'verificado' || estado === 'rechazado';
 
-              const inputDeshabilitado = esPrecintado || esEnTransito || esFinal;
-              const valorActual = inputDeshabilitado ? '' : (codigoInput[b.idBulto] || '');
-              const faltanMinimo = valorActual.length >= 1 && valorActual.length <= 5;
+                const inputDeshabilitado = esPrecintado || esEnTransito || esFinal;
+                const valorActual = inputDeshabilitado ? '' : (codigoInput[b.idBulto] || '');
+                const faltanMinimo = valorActual.length >= 1 && valorActual.length <= 5;
 
-              let textoBoton = 'Verificar Precinto';
-              let colorBoton = '#1890ff';
-              let accionBoton = () => solicitarVerificarPrecinto(b);
+                let textoBoton = 'Verificar Precinto';
+                let colorBoton = '#1890ff';
+                let accionBoton = () => solicitarVerificarPrecinto(b);
 
-              if (esPreparado) {
-                textoBoton = 'Asignar Precinto';
-                colorBoton = '#52c41a';
-                accionBoton = () => solicitarAsignarPrecinto(b);
-              } else if (esPrecintado) {
-                textoBoton = 'Confirmar Envío';
-                colorBoton = '#fa8c16';
-                accionBoton = () => solicitarConfirmarEnvio(b);
-              } else if (esEnTransito) {
-                textoBoton = 'Confirmar Recepción';
-                colorBoton = '#722ed1';
-                accionBoton = () => solicitarConfirmarRecepcion(b);
-              }
+                if (esPreparado) {
+                  textoBoton = 'Asignar Precinto';
+                  colorBoton = '#52c41a';
+                  accionBoton = () => solicitarAsignarPrecinto(b);
+                } else if (esPrecintado) {
+                  textoBoton = 'Confirmar Envío';
+                  colorBoton = '#fa8c16';
+                  accionBoton = () => solicitarConfirmarEnvio(b);
+                } else if (esEnTransito) {
+                  textoBoton = 'Confirmar Recepción';
+                  colorBoton = '#722ed1';
+                  accionBoton = () => solicitarConfirmarRecepcion(b);
+                }
 
-              const estiloInput = {
-                padding: '6px',
-                width: '100%',
-                boxSizing: 'border-box',
-                borderRadius: '4px',
-                textTransform: 'uppercase',
-                fontWeight: inputDeshabilitado ? 'normal' : 'bold',
-                backgroundColor: inputDeshabilitado ? 'transparent' : '#fff',
-                opacity: inputDeshabilitado ? 0.35 : 1,
-                border: inputDeshabilitado ? '1px dashed #ccc' : '1px solid #888',
-                cursor: inputDeshabilitado ? 'not-allowed' : 'text'
-              };
+                let placeholderInput = "CODIGO PRECINTO";
+                if (esFinal) placeholderInput = "BULTO CERRADO";
+                else if (esPrecintado) placeholderInput = "PRECINTO ASIGNADO";
+                else if (esEnTransito) placeholderInput = "EN VIAJE";
+                else if (esPreparado) placeholderInput = "CODIGO PRECINTO";
+                else if (esRecibido) placeholderInput = `COD PREC (${b.intentosRestantes ?? 3} INTENTOS)`;
 
-              let placeholderInput = "CODIGO PRECINTO";
-              if (esFinal) placeholderInput = "BULTO CERRADO";
-              else if (esPrecintado) placeholderInput = "PRECINTO ASIGNADO";
-              else if (esEnTransito) placeholderInput = "EN VIAJE";
-              else if (esPreparado) placeholderInput = "CODIGO PRECINTO";
-              else if (esRecibido) placeholderInput = `COD PREC (${b.intentosRestantes ?? 3} INTENTOS)`;
+                const historial = b.historialEstados || [];
+                const estadoPrecinto = b.estadoPrecinto || (b.precintoIntacto ? 'INTACTO' : 'VIOLADO');
 
-              const historial = b.historialEstados || [];
-              const estadoPrecinto = b.estadoPrecinto || (b.precintoIntacto ? 'INTACTO' : 'VIOLADO');
-
-              return (
-                <React.Fragment key={b.idBulto}>
-                  <tr style={{ backgroundColor: estaExpandido ? '#fafafa' : '#fff' }}>
-                    <td><strong>{b.idRemito}</strong></td>
-                    <td><strong>{b.numeroRemito || '-'}</strong></td>
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '4px' }}>
-                        <span>{b.idBulto}</span>
-                        <button
-                          type="button"
-                          onClick={() => toggleDesplegable(b.idBulto)}
-                          title={estaExpandido ? 'Ocultar historial de estados' : 'Ver historial de cambios de estado'}
-                          style={{
-                            padding: '2px 7px',
-                            fontSize: '11px',
-                            backgroundColor: estaExpandido ? '#1890ff' : '#f0f0f0',
-                            color: estaExpandido ? '#fff' : '#333',
-                            border: '1px solid #ccc',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            fontWeight: 'bold'
-                          }}
-                        >
-                          {estaExpandido ? '▲' : '▼'}
-                        </button>
-                      </div>
-                    </td>
-                    <td><strong>{b.codigoBulto}</strong></td>
-                    <td>
-                      <span style={{ color: '#555' }}>{b.origen}</span> &rarr; <strong>{b.destino}</strong>
-                    </td>
-                    <td>
-                      <span style={{
-                        fontWeight: 'bold',
-                        color: estado === 'verificado' ? 'green' : 
-                               estado === 'rechazado' ? 'red' : 
-                               esPreparado ? '#52c41a' :
-                               esPrecintado ? '#fa8c16' :
-                               esEnTransito ? '#722ed1' : '#1890ff'
-                      }}>
-                        {b.estadoActual}
-                      </span>
-                    </td>
-                    <td>
-                      <div style={{ position: 'relative', width: '100%' }}>
-                        {mensajeInput[b.idBulto] && !inputDeshabilitado && (
-                          <div style={{
-                            position: 'absolute',
-                            bottom: '115%',
-                            left: '0',
-                            backgroundColor: '#ff4d4f',
-                            color: '#fff',
-                            padding: '5px 8px',
-                            borderRadius: '4px',
-                            fontSize: '11px',
-                            fontWeight: 'bold',
-                            boxShadow: '0 2px 6px rgba(0,0,0,0.25)',
-                            zIndex: 10,
-                            maxWidth: '240px',
-                            lineHeight: '1.3'
-                          }}>
-                            {mensajeInput[b.idBulto]}
-                          </div>
-                        )}
-
-                        <input 
-                          type="text" 
-                          maxLength={10}
-                          placeholder={placeholderInput}
-                          value={valorActual}
-                          disabled={inputDeshabilitado}
-                          onKeyDown={e => handleKeyDown(e, b.idBulto)}
-                          onChange={e => handleInputChange(e, b.idBulto)}
-                          style={estiloInput}
-                        />
-
-                        {!inputDeshabilitado && faltanMinimo && (
-                          <div style={{
-                            fontSize: '11px',
-                            color: '#d46b08',
-                            fontWeight: 'bold',
-                            marginTop: '3px'
-                          }}>
-                            Ingrese como mínimo 6 caracteres ({valorActual.length}/6)
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                    <td>
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
-                      <button 
-                      onClick={accionBoton}
-                      disabled={esFinal}
-                      style={{
-                        padding: '6px 10px',
-                        width: '100%',
-                        maxWidth: '185px',
-                        boxSizing: 'border-box',
-                        whiteSpace: 'nowrap',
-                        backgroundColor: esFinal ? 'transparent' : colorBoton,
-                        color: esFinal ? '#999' : '#fff',
-                        border: esFinal ? '1px solid #ccc' : 'none',
-                        borderRadius: '4px',
-                        opacity: esFinal ? 0.45 : 1,
-                        cursor: esFinal ? 'not-allowed' : 'pointer',
-                        fontWeight: 'bold'
-                      }}
-                    >
-                      {textoBoton}
-                    </button>
-                        {esRecibido && (
-                          <button 
-                            onClick={() => solicitarRechazoViolado(b)}
-                            style={{
-                              padding: '5px 10px',
-                              width: '100%',
-                              maxWidth: '170px',
-                              whiteSpace: 'nowrap',
+                return (
+                  <React.Fragment key={b.idBulto}>
+                    <tr style={{ backgroundColor: estaExpandido ? 'rgba(0,0,0,0.02)' : undefined }}>
+                      <td className="strong">{b.idRemito}</td>
+                      <td className="strong">{b.numeroRemito || '-'}</td>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '4px' }}>
+                          <span className="muted">{b.idBulto}</span>
+                          <button
+                            type="button"
+                            onClick={() => toggleDesplegable(b.idBulto)}
+                            title={estaExpandido ? 'Ocultar historial de estados' : 'Ver historial de cambios de estado'}
+                            className={estaExpandido ? 'btn btn-primary btn-sm' : 'btn btn-sm'}
+                          >
+                            {estaExpandido ? '▲' : '▼'}
+                          </button>
+                        </div>
+                      </td>
+                      <td className="strong">{b.codigoBulto}</td>
+                      <td>
+                        <span className="muted">{b.origen}</span> &rarr; <span className="strong">{b.destino}</span>
+                      </td>
+                      <td>
+                        <span style={{
+                          fontWeight: 'bold',
+                          color: estado === 'verificado' ? 'green' : 
+                                 estado === 'rechazado' ? 'red' : 
+                                 esPreparado ? '#52c41a' :
+                                 esPrecintado ? '#fa8c16' :
+                                 esEnTransito ? '#722ed1' : '#1890ff'
+                        }}>
+                          {b.estadoActual}
+                        </span>
+                      </td>
+                      <td>
+                        <div style={{ position: 'relative', width: '100%' }}>
+                          {mensajeInput[b.idBulto] && !inputDeshabilitado && (
+                            <div style={{
+                              position: 'absolute',
+                              bottom: '115%',
+                              left: '0',
                               backgroundColor: '#ff4d4f',
                               color: '#fff',
-                              border: 'none',
+                              padding: '5px 8px',
                               borderRadius: '4px',
-                              cursor: 'pointer',
+                              fontSize: '11px',
                               fontWeight: 'bold',
-                              fontSize: '12px'
+                              boxShadow: '0 2px 6px rgba(0,0,0,0.25)',
+                              zIndex: 10,
+                              maxWidth: '240px',
+                              lineHeight: '1.3'
+                            }}>
+                              {mensajeInput[b.idBulto]}
+                            </div>
+                          )}
+
+                          <input 
+                            className="input"
+                            type="text" 
+                            maxLength={10}
+                            placeholder={placeholderInput}
+                            value={valorActual}
+                            disabled={inputDeshabilitado}
+                            onKeyDown={e => handleKeyDown(e, b.idBulto)}
+                            onChange={e => handleInputChange(e, b.idBulto)}
+                            style={{
+                              width: '100%',
+                              boxSizing: 'border-box',
+                              textTransform: 'uppercase',
+                              fontWeight: inputDeshabilitado ? 'normal' : 'bold',
+                              backgroundColor: inputDeshabilitado ? 'transparent' : undefined,
+                              opacity: inputDeshabilitado ? 0.35 : 1,
+                              cursor: inputDeshabilitado ? 'not-allowed' : 'text'
+                            }}
+                          />
+
+                          {!inputDeshabilitado && faltanMinimo && (
+                            <div style={{
+                              fontSize: '11px',
+                              color: '#d46b08',
+                              fontWeight: 'bold',
+                              marginTop: '3px'
+                            }}>
+                              Ingrese como mínimo 6 caracteres ({valorActual.length}/6)
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="right">
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
+                          <button 
+                            onClick={accionBoton}
+                            disabled={esFinal}
+                            className="btn btn-sm"
+                            style={{
+                              width: '100%',
+                              maxWidth: '185px',
+                              boxSizing: 'border-box',
+                              whiteSpace: 'nowrap',
+                              backgroundColor: esFinal ? 'transparent' : colorBoton,
+                              color: esFinal ? '#999' : '#fff',
+                              border: esFinal ? '1px solid #ccc' : 'none',
+                              opacity: esFinal ? 0.45 : 1,
+                              cursor: esFinal ? 'not-allowed' : 'pointer',
+                              fontWeight: 'bold'
                             }}
                           >
-                            Precinto Violado
+                            {textoBoton}
                           </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
 
-                  {/* FILA DESPLEGABLE CON HISTORIAL DE CAMBIOS DE ESTADO */}
-                  {estaExpandido && (
-                    <tr>
-                      <td colSpan="8" style={{ backgroundColor: '#f6f8fa', padding: '14px 20px' }}>
-                        <div style={{
-                          borderLeft: '4px solid #1890ff',
-                          paddingLeft: '14px'
-                        }}>
-                          <div style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            marginBottom: '10px',
-                            flexWrap: 'wrap',
-                            gap: '8px'
-                          }}>
-                            <strong style={{ fontSize: '14px', color: '#1f1f1f' }}>
-                              Trazabilidad de Cambios de Estado — {b.codigoBulto} (Remito: {b.numeroRemito || b.idRemito})
-                            </strong>
-                            <span style={{ fontSize: '12px', color: '#555' }}>
-                              Estado Precinto:{' '}
-                              <strong style={{ color: esPreparado ? '#888' : (b.precintoIntacto ? 'green' : 'red') }}>
-                                {esPreparado ? 'Sin asignar' : estadoPrecinto}
-                              </strong>{' '}
-                              | Intacto:{' '}
-                              <strong style={{ color: b.precintoIntacto ? 'green' : 'red' }}>
-                                {b.precintoIntacto ? 'Sí' : 'No'}
-                              </strong>
-                            </span>
-                          </div>
-
-                          {historial.length === 0 ? (
-                            <p style={{ margin: 0, color: '#777', fontSize: '13px' }}>
-                              No hay registros de cambios de estado para este bulto.
-                            </p>
-                          ) : (
-                            <table
-                              border="1"
-                              cellPadding="6"
+                          {esRecibido && (
+                            <button 
+                              onClick={() => solicitarRechazoViolado(b)}
+                              className="btn btn-danger btn-sm"
                               style={{
                                 width: '100%',
-                                borderCollapse: 'collapse',
-                                backgroundColor: '#fff',
-                                fontSize: '13px'
+                                maxWidth: '185px',
+                                boxSizing: 'border-box',
+                                whiteSpace: 'nowrap'
                               }}
                             >
-                              <thead>
-                                <tr style={{ backgroundColor: '#e6f7ff' }}>
-                                  <th>ID Cambio</th>
-                                  <th>Estado</th>
-                                  <th>Tipo (State)</th>
-                                  <th>Fecha y Hora Inicio (GMT-3)</th>
-                                  <th>Fecha y Hora Fin (GMT-3)</th>
-                                  <th>Es Inicial</th>
-                                  <th>Es Actual</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {historial.map(ce => (
-                                  <tr
-                                    key={ce.idCambioEstado}
-                                    style={{
-                                      backgroundColor: ce.esActual ? '#f6ffed' : '#fff',
-                                      fontWeight: ce.esActual ? 'bold' : 'normal'
-                                    }}
-                                  >
-                                    <td>{ce.idCambioEstado}</td>
-                                    <td>{ce.estado}</td>
-                                    <td><code>{ce.tipoEstado}</code></td>
-                                    <td>{ce.fechaHoraInicio}</td>
-                                    <td>{ce.fechaHoraFin || 'En curso'}</td>
-                                    <td>{ce.esInicial ? 'Sí' : 'No'}</td>
-                                    <td>
-                                      {ce.esActual ? (
-                                        <span style={{ color: 'green' }}>● Actual</span>
-                                      ) : (
-                                        <span style={{ color: '#888' }}>Histórico</span>
-                                      )}
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
+                              Precinto Violado
+                            </button>
                           )}
                         </div>
                       </td>
                     </tr>
-                  )}
-                </React.Fragment>
-              );
-            })
-          )}
-        </tbody>
-      </table>
+
+                    {/* FILA DESPLEGABLE CON HISTORIAL DE CAMBIOS DE ESTADO */}
+                    {estaExpandido && (
+                      <tr>
+                        <td colSpan="8" style={{ padding: '14px 20px', backgroundColor: 'rgba(0,0,0,0.015)' }}>
+                          <div style={{
+                            borderLeft: '3px solid currentColor',
+                            paddingLeft: '14px'
+                          }}>
+                            <div style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              marginBottom: '10px',
+                              flexWrap: 'wrap',
+                              gap: '8px'
+                            }}>
+                              <h4 className="card-subtitle" style={{ margin: 0 }}>
+                                Trazabilidad de Cambios de Estado — {b.codigoBulto} (Remito: {b.numeroRemito || b.idRemito})
+                              </h4>
+                              <span className="muted" style={{ fontSize: '12px' }}>
+                                Estado Precinto:{' '}
+                                <strong style={{ color: esPreparado ? '#888' : (b.precintoIntacto ? 'green' : 'red') }}>
+                                  {esPreparado ? 'Sin asignar' : estadoPrecinto}
+                                </strong>{' '}
+                                | Intacto:{' '}
+                                <strong style={{ color: b.precintoIntacto ? 'green' : 'red' }}>
+                                  {b.precintoIntacto ? 'Sí' : 'No'}
+                                </strong>
+                              </span>
+                            </div>
+
+                            {historial.length === 0 ? (
+                              <p className="muted" style={{ margin: 0 }}>
+                                No hay registros de cambios de estado para este bulto.
+                              </p>
+                            ) : (
+                              <div className="table-wrap">
+                                <table className="table">
+                                  <thead>
+                                    <tr>
+                                      <th>ID Cambio</th>
+                                      <th>Estado</th>
+                                      <th>Tipo (State)</th>
+                                      <th>Fecha y Hora Inicio (GMT-3)</th>
+                                      <th>Fecha y Hora Fin (GMT-3)</th>
+                                      <th>Es Inicial</th>
+                                      <th>Es Actual</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {historial.map(ce => (
+                                      <tr
+                                        key={ce.idCambioEstado}
+                                        style={{
+                                          fontWeight: ce.esActual ? 'bold' : 'normal'
+                                        }}
+                                      >
+                                        <td className="muted">{ce.idCambioEstado}</td>
+                                        <td>{ce.estado}</td>
+                                        <td><code>{ce.tipoEstado}</code></td>
+                                        <td>{ce.fechaHoraInicio}</td>
+                                        <td>{ce.fechaHoraFin || 'En curso'}</td>
+                                        <td>{ce.esInicial ? 'Sí' : 'No'}</td>
+                                        <td>
+                                          {ce.esActual ? (
+                                            <span style={{ color: 'green' }}>● Actual</span>
+                                          ) : (
+                                            <span className="muted">Histórico</span>
+                                          )}
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
 
       {/* MODAL DE CONFIRMACIÓN */}
       {modalConfirm && (
@@ -513,18 +480,17 @@ export default function LogisticaBultos({ idSucursal, sucursalActual }) {
           backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex',
           alignItems: 'center', justifyContent: 'center', zIndex: 1000
         }}>
-          <div style={{
-            backgroundColor: '#fff', padding: '25px', borderRadius: '8px',
+          <div className="card" style={{
             maxWidth: '430px', width: '90%', textAlign: 'center',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+            margin: 0,
             borderTop: modalConfirm.tipo === 'violado' ? '5px solid #ff4d4f' : 
                        modalConfirm.tipo === 'asignar' ? '5px solid #52c41a' : '5px solid #1890ff'
           }}>
-            <h3 style={{ marginTop: 0, color: modalConfirm.tipo === 'violado' ? '#cf1322' : '#000' }}>
+            <h3 className="card-title" style={{ color: modalConfirm.tipo === 'violado' ? '#cf1322' : undefined }}>
               {modalConfirm.titulo}
             </h3>
-            <p style={{ color: '#444' }}>Bulto: <strong>{modalConfirm.codigoBulto}</strong></p>
-            <p style={{ color: '#555', lineHeight: '1.4' }}>{modalConfirm.mensaje}</p>
+            <p>Bulto: <span className="strong">{modalConfirm.codigoBulto}</span></p>
+            <p className="muted" style={{ lineHeight: '1.4' }}>{modalConfirm.mensaje}</p>
             
             {modalConfirm.precinto && (
               <div style={{
@@ -544,23 +510,17 @@ export default function LogisticaBultos({ idSucursal, sucursalActual }) {
 
             <div style={{ display: 'flex', justifyContent: 'center', gap: '15px', marginTop: '20px' }}>
               <button 
+                type="button"
                 onClick={() => setModalConfirm(null)}
-                style={{
-                  padding: '8px 18px', backgroundColor: '#f5f5f5', border: '1px solid #d9d9d9',
-                  borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold'
-                }}
+                className="btn"
               >
                 Cancelar
               </button>
               <button 
+                type="button"
                 onClick={ejecutarAccionConfirmada}
-                style={{
-                  padding: '8px 18px', 
-                  backgroundColor: modalConfirm.tipo === 'violado' ? '#ff4d4f' : 
-                                   modalConfirm.tipo === 'asignar' ? '#52c41a' : '#1890ff', 
-                  color: '#fff',
-                  border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold'
-                }}
+                className={modalConfirm.tipo === 'violado' ? 'btn btn-danger' : 'btn btn-primary'}
+                style={modalConfirm.tipo === 'asignar' ? { backgroundColor: '#52c41a', borderColor: '#52c41a' } : undefined}
               >
                 Aceptar
               </button>
@@ -568,6 +528,6 @@ export default function LogisticaBultos({ idSucursal, sucursalActual }) {
           </div>
         </div>
       )}
-    </div>
+    </section>
   );
 }
