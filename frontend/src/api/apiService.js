@@ -109,15 +109,36 @@ export const apiService = {
     return res.json();
   },
 
-  // --- Ventas (Patrón Strategy) ---
-  registrarVenta: async (datosVenta) => {
-    const res = await fetch(`${API_BASE_URL}/ventas`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(datosVenta),
-    });
-    return res.json();
-  },
+// --- MÓDULO VENTAS Y DEVOLUCIONES ---
+getVentas: async (idSucursal = '') => {
+  const query = idSucursal ? `?idSucursal=${idSucursal}` : '';
+  const res = await fetch(`${API_BASE_URL}/ventas/${query}`);
+  return res.json();
+},
+
+registrarVenta: async (payloadVenta) => {
+  const res = await fetch(`${API_BASE_URL}/ventas/`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payloadVenta),
+  });
+  return res.json();
+},
+
+getDevoluciones: async (idSucursal = '') => {
+  const query = idSucursal ? `?idSucursal=${idSucursal}` : '';
+  const res = await fetch(`${API_BASE_URL}/ventas/devoluciones${query}`);
+  return res.json();
+},
+
+registrarDevolucion: async (payloadDevolucion) => {
+  const res = await fetch(`${API_BASE_URL}/ventas/devoluciones`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payloadDevolucion),
+  });
+  return res.json();
+},
 
   // --- Reportes ---
   getReporteVentas: async (fDesde, fHasta, idSucursal) => {
