@@ -181,12 +181,26 @@ export const apiService = {
     return res.json();
   },
 
+  getProveedores: async () => {
+    const res = await fetch(`${API_BASE_URL}/catalogo/proveedores`);
+    return res.json();
+  },
+
+  registrarPedidoMasivoProveedor: async (idEstablecimiento, items) => {
+    const res = await fetch(`${API_BASE_URL}/catalogo/establecimientos/${idEstablecimiento}/pedido-masivo`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items }),
+    });
+    return res.json();
+  },
+  
   // --- Asignar / Quitar productos de un Establecimiento puntual ---
-  guardarStockEstablecimiento: async (idEstablecimiento, idProducto, cantidadDisponible) => {
+  guardarStockEstablecimiento: async (idEstablecimiento, idProducto, cantidadDisponible, modo = null) => {
     const res = await fetch(`${API_BASE_URL}/catalogo/establecimientos/${idEstablecimiento}/stock`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ idProducto, cantidadDisponible }),
+      body: JSON.stringify({ idProducto, cantidadDisponible, modo }),
     });
     return res.json();
   },

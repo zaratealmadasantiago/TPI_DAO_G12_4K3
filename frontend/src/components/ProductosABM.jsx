@@ -8,30 +8,37 @@ export default function ProductosABM() {
 
   const [productosGlobales, setProductosGlobales] = useState([]);
   const [categorias, setCategorias] = useState([]);
+  const [proveedores, setProveedores] = useState([]);
   const [stockEstablecimiento, setStockEstablecimiento] = useState([]);
 
-  // Buscador escribible + desplegable para asignar stock
+  // Filtro de Proveedor y buscador para el Pedido a Proveedores en CD
+  const [idProveedorPedido, setIdProveedorPedido] = useState('TODOS');
   const [busquedaProducto, setBusquedaProducto] = useState('');
   const [idProductoSeleccionado, setIdProductoSeleccionado] = useState('');
   const [cantidadStock, setCantidadStock] = useState('10');
   const [errorAsignacion, setErrorAsignacion] = useState('');
 
-  // Filtro por categoría en el Catálogo de Productos
-  const [filtroCategoriaId, setFiltroCategoriaId] = useState('TODAS');
+  // Lista acumulada de renglones del Pedido Grande al Proveedor
+  const [itemsPedido, setItemsPedido] = useState([]);
 
-  // Formulario para añadir nuevo producto al catálogo
+  // Filtros en el Catálogo de Productos
+  const [filtroCategoriaId, setFiltroCategoriaId] = useState('TODAS');
+  const [filtroProveedorId, setFiltroProveedorId] = useState('TODOS');
+
+  // Formulario para añadir nuevo producto al catálogo (con Proveedor y Categoría)
   const [formNuevoProd, setFormNuevoProd] = useState({
     codigoBarras: '',
     nombre: '',
     precioVenta: '',
     costoUnitario: '',
     stockMinimo: '5',
-    idCategoria: ''
+    idCategoria: '',
+    idProveedor: ''
   });
   const [erroresNuevoProd, setErroresNuevoProd] = useState({});
 
   // Modales de confirmación
-  const [modalConfirmarStock, setModalConfirmarStock] = useState(null);
+  const [modalConfirmarPedidoGrande, setModalConfirmarPedidoGrande] = useState(null);
   const [modalConfirmarNuevoProd, setModalConfirmarNuevoProd] = useState(null);
   const [modalEstadoProducto, setModalEstadoProducto] = useState(null);
   const [modalQuitarLocal, setModalQuitarLocal] = useState(null);
@@ -41,10 +48,11 @@ export default function ProductosABM() {
   }, []);
 
   const cargarInicial = async () => {
-    const [resEst, resProd, resCat] = await Promise.all([
+    const [resEst, resProd, resCat, resProv] = await Promise.all([
       apiService.getEstablecimientos(),
       apiService.getProductos(),
-      apiService.getCategorias ? apiService.getCategorias() : Promise.resolve({ datos: [] })
+      apiService.getCategorias ? apiService.getCategorias() : Promise.resolve({ datos: [] }),
+      apiService.getProveedores ? apiService.getProveedores() : Promise.resolve({ datos: [] })
     ]);
 
     if (resEst && resEst.datos) {
@@ -68,6 +76,16 @@ export default function ProductosABM() {
         }));
       }
     }
+
+    if (resProv && resProv.datos) {
+      setProveedores(resProv.datos);
+      if (resProv.datos.length > 0 && !formNuevoProd.idProveedor) {
+        setFormNuevoProd(prev => ({
+          ...prev,
+          idProveedor: String(resProv.datos[0].idProveedor)
+        }));
+      }
+    }
   };
 
   // Establecimiento activo según el modo texto ('cd' o 'sucursal')
@@ -85,6 +103,9 @@ export default function ProductosABM() {
     } else {
       setStockEstablecimiento([]);
     }
+    setBusquedaProducto('');
+    setIdProductoSeleccionado('');
+    setErrorAsignacion('');
   }, [idEstablecimientoActivo]);
 
   const cargarStockLocal = async (idEst) => {
@@ -96,10 +117,29 @@ export default function ProductosABM() {
     }
   };
 
-  // --- BUSCADOR ESCRIBIBLE + DESPLEGABLE DE PRODUCTOS HABILITADOS ---
-  const productosHabilitados = productosGlobales.filter(p => p.esActivo !== false);
+  // --- PRODUCTOS HABILITADOS DISPONIBLES SEGÚN EL PROVEEDOR SELECCIONADO ---
+  const productosHabilitados = productosGlobales.filter(p => {
+    if (p.esActivo === false) return false;
+    if (idProveedorPedido !== 'TODOS') {
+      return String(p.idProveedor) === String(idProveedorPedido);
+    }
+    return true;
+  });
 
-  const formatearOpcionProducto = (p) => `${p.nombre} — Cód: ${p.codigoBarras}`;
+  const formatearOpcionProducto = (p) => {
+    const prov =
+      p.proveedorNombre ||
+      proveedores.find(pr => Number(pr.idProveedor) === Number(p.idProveedor))?.razonSocial ||
+      '';
+    return prov ? `${p.nombre} — Cód: ${p.codigoBarras} [${prov}]` : `${p.nombre} — Cód: ${p.codigoBarras}`;
+  };
+
+  const handleCambioProveedorPedido = (nuevoIdProv) => {
+    setIdProveedorPedido(nuevoIdProv);
+    setBusquedaProducto('');
+    setIdProductoSeleccionado('');
+    setErrorAsignacion('');
+  };
 
   const handleBusquedaProductoChange = (e) => {
     const valor = e.target.value;
@@ -121,7 +161,7 @@ export default function ProductosABM() {
     }
   };
 
-  // --- VALIDACIÓN DE CANTIDAD A ASIGNAR ---
+  // --- VALIDACIÓN DE CANTIDAD ---
   const handleCantidadStockKeyDown = (e) => {
     if (
       e.key === 'Backspace' ||
@@ -150,14 +190,11 @@ export default function ProductosABM() {
     setErrorAsignacion('');
   };
 
-  // --- SOLICITAR ASIGNACIÓN DE STOCK (ABRE MODAL) ---
-  const handleSolicitarGuardarStockLocal = (e) => {
+  // --- AGREGAR UN RENGLÓN A LA LISTA DEL PEDIDO GRANDE ---
+  const handleAgregarItemAPedido = (e) => {
     e.preventDefault();
-    if (!idEstablecimientoActivo) {
-      return setErrorAsignacion('Seleccione un establecimiento válido.');
-    }
+    if (ambito !== 'cd' || !idEstablecimientoActivo) return;
 
-    // Buscar coincidencia si escribió nombre o código exacto sin elegir del datalist
     let prodSeleccionado = productosGlobales.find(
       p => String(p.idProducto) === String(idProductoSeleccionado)
     );
@@ -173,12 +210,21 @@ export default function ProductosABM() {
     }
 
     if (!prodSeleccionado) {
-      return setErrorAsignacion('Seleccione o escriba un producto válido del catálogo.');
+      return setErrorAsignacion('Seleccione o escriba un producto válido del proveedor.');
     }
 
     if (prodSeleccionado.esActivo === false) {
       return setErrorAsignacion(
-        `El producto "${prodSeleccionado.nombre}" está deshabilitado y no puede recibir stock.`
+        `El producto "${prodSeleccionado.nombre}" está deshabilitado y no puede agregarse al pedido.`
+      );
+    }
+
+    if (
+      idProveedorPedido !== 'TODOS' &&
+      String(prodSeleccionado.idProveedor) !== String(idProveedorPedido)
+    ) {
+      return setErrorAsignacion(
+        `El producto "${prodSeleccionado.nombre}" no pertenece al proveedor seleccionado.`
       );
     }
 
@@ -187,40 +233,118 @@ export default function ProductosABM() {
       return setErrorAsignacion('Ingrese una cantidad válida mayor a 0 (1 a 9999).');
     }
 
-    setModalConfirmarStock({
+    const provObj = proveedores.find(
+      pr => Number(pr.idProveedor) === Number(prodSeleccionado.idProveedor)
+    );
+    const proveedorNombre =
+      prodSeleccionado.proveedorNombre || provObj?.razonSocial || 'Sin proveedor';
+
+    setItemsPedido(prev => {
+      const existente = prev.find(i => i.idProducto === prodSeleccionado.idProducto);
+      if (existente) {
+        return prev.map(i =>
+          i.idProducto === prodSeleccionado.idProducto
+            ? { ...i, cantidad: i.cantidad + cantNum }
+            : i
+        );
+      }
+      return [
+        ...prev,
+        {
+          idProducto: prodSeleccionado.idProducto,
+          codigoBarras: prodSeleccionado.codigoBarras,
+          nombre: prodSeleccionado.nombre,
+          idProveedor: prodSeleccionado.idProveedor,
+          proveedorNombre,
+          costoUnitario: prodSeleccionado.costoUnitario,
+          cantidad: cantNum
+        }
+      ];
+    });
+
+    setBusquedaProducto('');
+    setIdProductoSeleccionado('');
+    setCantidadStock('10');
+    setErrorAsignacion('');
+  };
+
+  const handleActualizarCantidadItemPedido = (idProducto, nuevaCantStr) => {
+    const limpio = nuevaCantStr.replace(/[^0-9]/g, '').slice(0, 4);
+    const cantNum = parseInt(limpio, 10);
+    setItemsPedido(prev =>
+      prev.map(i =>
+        i.idProducto === idProducto
+          ? { ...i, cantidad: isNaN(cantNum) ? 0 : cantNum }
+          : i
+      )
+    );
+  };
+
+  const handleQuitarItemPedido = (idProducto) => {
+    setItemsPedido(prev => prev.filter(i => i.idProducto !== idProducto));
+  };
+
+  const handleVaciarPedido = () => {
+    setItemsPedido([]);
+    setErrorAsignacion('');
+  };
+
+  // --- SOLICITAR CONFIRMACIÓN DEL PEDIDO GRANDE ---
+  const handleSolicitarConfirmarPedidoGrande = () => {
+    if (itemsPedido.length === 0) {
+      return setErrorAsignacion('Agregue al menos un producto a la lista del pedido.');
+    }
+
+    const itemInvalido = itemsPedido.find(i => !i.cantidad || i.cantidad <= 0);
+    if (itemInvalido) {
+      return setErrorAsignacion(
+        `La cantidad pedida de "${itemInvalido.nombre}" debe ser mayor a 0.`
+      );
+    }
+
+    const totalUnidades = itemsPedido.reduce((acc, i) => acc + i.cantidad, 0);
+    const costoTotal = itemsPedido.reduce((acc, i) => acc + i.cantidad * i.costoUnitario, 0);
+    const proveedoresUnicos = [...new Set(itemsPedido.map(i => i.proveedorNombre))];
+
+    setModalConfirmarPedidoGrande({
       idEstablecimiento: idEstablecimientoActivo,
       establecimientoNombre: establecimientoActivo.nombre,
-      idProducto: prodSeleccionado.idProducto,
-      productoNombre: prodSeleccionado.nombre,
-      codigoBarras: prodSeleccionado.codigoBarras,
-      cantidadDisponible: cantNum
+      items: itemsPedido,
+      totalUnidades,
+      costoTotal,
+      proveedoresResumen: proveedoresUnicos.join(', ')
     });
   };
 
-  const ejecutarGuardarStockLocal = async () => {
-    if (!modalConfirmarStock) return;
-    const datos = modalConfirmarStock;
-    setModalConfirmarStock(null);
+  const ejecutarConfirmarPedidoGrande = async () => {
+    if (!modalConfirmarPedidoGrande) return;
+    const datos = modalConfirmarPedidoGrande;
+    setModalConfirmarPedidoGrande(null);
 
-    const res = await apiService.guardarStockEstablecimiento(
+    const payloadItems = datos.items.map(i => ({
+      idProducto: i.idProducto,
+      cantidad: i.cantidad
+    }));
+
+    const res = await apiService.registrarPedidoMasivoProveedor(
       datos.idEstablecimiento,
-      datos.idProducto,
-      datos.cantidadDisponible
+      payloadItems
     );
 
     if (res && res.status === 'success') {
-      alert(res.mensaje || 'Stock actualizado correctamente.');
-      cargarStockLocal(datos.idEstablecimiento);
+      alert(res.mensaje || 'Pedido registrado correctamente.');
+      setItemsPedido([]);
       setBusquedaProducto('');
       setIdProductoSeleccionado('');
       setCantidadStock('10');
       setErrorAsignacion('');
+      cargarStockLocal(datos.idEstablecimiento);
     } else {
-      alert(res?.mensaje || 'Error al actualizar stock.');
+      alert(res?.mensaje || 'Error al registrar el pedido.');
     }
   };
 
-  // --- QUITAR PRODUCTO DEL ESTABLECIMIENTO PUNTUAL ---
+  // --- QUITAR PRODUCTO DEL CD ---
   const ejecutarQuitarStockLocal = async () => {
     if (!modalQuitarLocal) return;
     const item = modalQuitarLocal;
@@ -265,6 +389,10 @@ export default function ProductosABM() {
       errs.idCategoria = 'Seleccione una categoría.';
     }
 
+    if (!formNuevoProd.idProveedor) {
+      errs.idProveedor = 'Seleccione un proveedor.';
+    }
+
     setErroresNuevoProd(errs);
     return Object.keys(errs).length === 0;
   };
@@ -276,6 +404,9 @@ export default function ProductosABM() {
     const catObj = categorias.find(
       c => String(c.idCategoria) === String(formNuevoProd.idCategoria)
     );
+    const provObj = proveedores.find(
+      pr => String(pr.idProveedor) === String(formNuevoProd.idProveedor)
+    );
 
     setModalConfirmarNuevoProd({
       codigoBarras: formNuevoProd.codigoBarras.trim(),
@@ -284,7 +415,11 @@ export default function ProductosABM() {
       costoUnitario: parseFloat(formNuevoProd.costoUnitario),
       stockMinimo: parseInt(formNuevoProd.stockMinimo || '5', 10),
       idCategoria: parseInt(formNuevoProd.idCategoria, 10),
-      categoriaNombre: catObj ? catObj.nombre : `ID ${formNuevoProd.idCategoria}`
+      categoriaNombre: catObj ? catObj.nombre : `ID ${formNuevoProd.idCategoria}`,
+      idProveedor: parseInt(formNuevoProd.idProveedor, 10),
+      proveedorNombre: provObj
+        ? `${provObj.razonSocial} (CUIT: ${provObj.cuit})`
+        : `ID ${formNuevoProd.idProveedor}`
     });
   };
 
@@ -302,7 +437,8 @@ export default function ProductosABM() {
         precioVenta: '',
         costoUnitario: '',
         stockMinimo: '5',
-        idCategoria: prev.idCategoria
+        idCategoria: prev.idCategoria,
+        idProveedor: prev.idProveedor
       }));
       setErroresNuevoProd({});
       const resProd = await apiService.getProductos();
@@ -321,10 +457,12 @@ export default function ProductosABM() {
     const res = await apiService.cambiarEstadoProducto(producto.idProducto, nuevoEstado);
     if (res && res.status === 'success') {
       alert(res.mensaje);
-      // Si el producto deshabilitado estaba seleccionado en el buscador, limpiarlo
-      if (!nuevoEstado && String(idProductoSeleccionado) === String(producto.idProducto)) {
-        setIdProductoSeleccionado('');
-        setBusquedaProducto('');
+      if (!nuevoEstado) {
+        if (String(idProductoSeleccionado) === String(producto.idProducto)) {
+          setIdProductoSeleccionado('');
+          setBusquedaProducto('');
+        }
+        setItemsPedido(prev => prev.filter(i => i.idProducto !== producto.idProducto));
       }
       const resProd = await apiService.getProductos();
       if (resProd && resProd.datos) setProductosGlobales(resProd.datos);
@@ -333,15 +471,30 @@ export default function ProductosABM() {
     }
   };
 
-  // Productos filtrados por categoría para la grilla del Catálogo
+  // Productos filtrados por Categoría y Proveedor para la grilla del Catálogo
   const productosFiltradosCatalogo = productosGlobales.filter(p => {
-    if (filtroCategoriaId === 'TODAS') return true;
-    return String(p.idCategoria) === String(filtroCategoriaId);
+    const cumpleCat =
+      filtroCategoriaId === 'TODAS' || String(p.idCategoria) === String(filtroCategoriaId);
+    const cumpleProv =
+      filtroProveedorId === 'TODOS' || String(p.idProveedor) === String(filtroProveedorId);
+    return cumpleCat && cumpleProv;
   });
+
+  // Producto actualmente identificado en el input (en CD)
+  const productoIdentificadoActual = productosGlobales.find(
+    p => String(p.idProducto) === String(idProductoSeleccionado)
+  );
+
+  // Totales del carrito de Pedido Grande
+  const totalUnidadesPedido = itemsPedido.reduce((acc, i) => acc + (i.cantidad || 0), 0);
+  const costoTotalPedido = itemsPedido.reduce(
+    (acc, i) => acc + (i.cantidad || 0) * i.costoUnitario,
+    0
+  );
 
   return (
     <div className="page" style={{ position: 'relative' }}>
-      <h2 className="page-title">ABM - Gestión de Productos y Stock por Establecimiento</h2>
+      <h2 className="page-title">ABM - Gestión de Productos, Proveedores y Stock</h2>
 
       {/* SECCIÓN 1: Selector estilo texto igual a Logística (CD / Sucursales) */}
       <section className="card">
@@ -422,49 +575,233 @@ export default function ProductosABM() {
         </div>
       </section>
 
-      {/* SECCIÓN 2: Asignar / Actualizar Stock y Productos actualmente en este establecimiento */}
+      {/* SECCIÓN 2: Pedido a Proveedores (solo CD) y Existencias del Establecimiento */}
       {establecimientoActivo && (
         <section className="card">
-          <h3 className="card-title">
-            Asignar / Actualizar Stock — {establecimientoActivo.nombre}
-          </h3>
+          {ambito === 'cd' ? (
+            <>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: '12px',
+                  marginBottom: '12px'
+                }}
+              >
+                <h3 className="card-title" style={{ margin: 0 }}>
+                  Pedido a Proveedores — Ingreso de Stock en {establecimientoActivo.nombre}
+                </h3>
 
-          <form onSubmit={handleSolicitarGuardarStockLocal} className="form-row" noValidate>
-            <div className="grow" style={{ position: 'relative' }}>
-              <input
-                className="input"
-                list="lista-productos-habilitados"
-                placeholder="Escriba nombre/código o despliegue para elegir producto..."
-                value={busquedaProducto}
-                onChange={handleBusquedaProductoChange}
-                style={{ width: '100%', boxSizing: 'border-box' }}
-              />
-              <datalist id="lista-productos-habilitados">
-                {productosHabilitados.map(p => (
-                  <option key={p.idProducto} value={formatearOpcionProducto(p)} />
-                ))}
-              </datalist>
-            </div>
+                <div className="field-inline">
+                  <label htmlFor="sel-proveedor-pedido">Filtrar por Proveedor:</label>
+                  <select
+                    id="sel-proveedor-pedido"
+                    className="select"
+                    value={idProveedorPedido}
+                    onChange={e => handleCambioProveedorPedido(e.target.value)}
+                  >
+                    <option value="TODOS">Todos los proveedores</option>
+                    {proveedores.map(prov => (
+                      <option key={prov.idProveedor} value={prov.idProveedor}>
+                        {prov.razonSocial} ({prov.cuit})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
 
-            <input
-              className="input narrow"
-              type="text"
-              inputMode="numeric"
-              maxLength={4}
-              placeholder="Cantidad"
-              value={cantidadStock}
-              onKeyDown={handleCantidadStockKeyDown}
-              onChange={handleCantidadStockChange}
-            />
+              {/* Formulario para ir agregando productos al Pedido Grande */}
+              <form onSubmit={handleAgregarItemAPedido} className="form-row" noValidate>
+                <div className="grow" style={{ position: 'relative' }}>
+                  <input
+                    className="input"
+                    list="lista-productos-habilitados"
+                    placeholder={
+                      productosHabilitados.length === 0
+                        ? 'Este proveedor no tiene productos habilitados disponibles...'
+                        : 'Escriba nombre/código o despliegue para elegir producto del proveedor...'
+                    }
+                    value={busquedaProducto}
+                    onChange={handleBusquedaProductoChange}
+                    style={{ width: '100%', boxSizing: 'border-box' }}
+                  />
+                  <datalist id="lista-productos-habilitados">
+                    {productosHabilitados.map(p => (
+                      <option key={p.idProducto} value={formatearOpcionProducto(p)} />
+                    ))}
+                  </datalist>
+                </div>
 
-            <button type="submit" className="btn btn-primary">
-              Guardar Stock en Establecimiento
-            </button>
-          </form>
+                <input
+                  className="input narrow"
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={4}
+                  placeholder="Cant. Pedida"
+                  value={cantidadStock}
+                  onKeyDown={handleCantidadStockKeyDown}
+                  onChange={handleCantidadStockChange}
+                />
 
-          {errorAsignacion && (
-            <div style={{ color: '#cf1322', fontSize: '13px', fontWeight: 'bold', marginTop: '8px' }}>
-              {errorAsignacion}
+                <button type="submit" className="btn btn-outline">
+                  + Agregar al Pedido
+                </button>
+              </form>
+
+              {productoIdentificadoActual && (
+                <div className="muted" style={{ fontSize: '13px', marginTop: '8px' }}>
+                  Proveedor:{' '}
+                  <strong className="strong">
+                    {productoIdentificadoActual.proveedorNombre ||
+                      proveedores.find(
+                        pr => Number(pr.idProveedor) === Number(productoIdentificadoActual.idProveedor)
+                      )?.razonSocial ||
+                      'Sin proveedor'}
+                  </strong>{' '}
+                  — Costo unitario: <strong>${productoIdentificadoActual.costoUnitario}</strong>
+                </div>
+              )}
+
+              {errorAsignacion && (
+                <div style={{ color: '#cf1322', fontSize: '13px', fontWeight: 'bold', marginTop: '8px' }}>
+                  {errorAsignacion}
+                </div>
+              )}
+
+              {/* Lista / Detalle del Pedido Grande en preparación */}
+              {itemsPedido.length > 0 && (
+                <div
+                  style={{
+                    marginTop: '16px',
+                    padding: '14px',
+                    border: '1px solid rgba(24, 144, 255, 0.35)',
+                    backgroundColor: 'rgba(24, 144, 255, 0.04)',
+                    borderRadius: '6px'
+                  }}
+                >
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      flexWrap: 'wrap',
+                      gap: '10px',
+                      marginBottom: '10px'
+                    }}
+                  >
+                    <h4 className="card-subtitle" style={{ margin: 0 }}>
+                      Detalle del Pedido a Confirmar ({itemsPedido.length}{' '}
+                      {itemsPedido.length === 1 ? 'producto' : 'productos'})
+                    </h4>
+
+                    <div className="muted" style={{ fontSize: '13px' }}>
+                      Total unidades: <strong className="strong">{totalUnidadesPedido} u.</strong> | Costo estimado:{' '}
+                      <strong className="strong">
+                        ${costoTotalPedido.toLocaleString('es-AR', {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2
+                        })}
+                      </strong>
+                    </div>
+                  </div>
+
+                  <div className="table-wrap">
+                    <table className="table">
+                      <thead>
+                        <tr>
+                          <th>Código</th>
+                          <th>Producto</th>
+                          <th>Proveedor</th>
+                          <th className="right">Stock Actual CD</th>
+                          <th className="right">Cant. Pedida</th>
+                          <th className="right">Stock Resultante</th>
+                          <th className="right">Subtotal Costo</th>
+                          <th className="right">Quitar</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {itemsPedido.map(item => {
+                          const stockAct =
+                            stockEstablecimiento.find(s => Number(s.idProducto) === Number(item.idProducto))
+                              ?.cantidadDisponible || 0;
+                          const stockRes = stockAct + (item.cantidad || 0);
+                          const subtotal = (item.cantidad || 0) * item.costoUnitario;
+
+                          return (
+                            <tr key={item.idProducto}>
+                              <td>{item.codigoBarras}</td>
+                              <td className="strong">{item.nombre}</td>
+                              <td>{item.proveedorNombre}</td>
+                              <td className="right">{stockAct} u.</td>
+                              <td className="right">
+                                <input
+                                  type="text"
+                                  inputMode="numeric"
+                                  className="input narrow"
+                                  style={{ width: '75px', textAlign: 'right', padding: '4px 6px' }}
+                                  value={item.cantidad || ''}
+                                  onChange={e =>
+                                    handleActualizarCantidadItemPedido(item.idProducto, e.target.value)
+                                  }
+                                />
+                              </td>
+                              <td className="right">
+                                <span className="tag tag-success">{stockRes} u.</span>
+                              </td>
+                              <td className="right">
+                                ${subtotal.toLocaleString('es-AR', {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2
+                                })}
+                              </td>
+                              <td className="right">
+                                <button
+                                  type="button"
+                                  className="btn btn-danger btn-sm"
+                                  onClick={() => handleQuitarItemPedido(item.idProducto)}
+                                >
+                                  Quitar
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'flex-end',
+                      gap: '10px',
+                      marginTop: '12px'
+                    }}
+                  >
+                    <button type="button" className="btn" onClick={handleVaciarPedido}>
+                      Limpiar Lista
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={handleSolicitarConfirmarPedidoGrande}
+                    >
+                      Confirmar Pedido ({totalUnidadesPedido} u.)
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <div style={{ marginBottom: '12px' }}>
+              <h3 className="card-title" style={{ marginBottom: '4px' }}>
+                Stock Actual en {establecimientoActivo.nombre}
+              </h3>
+              <p className="muted" style={{ margin: 0, fontSize: '13px' }}>
+                El ingreso de mercadería a sucursales se realiza exclusivamente mediante la verificación de bultos en el módulo <strong>Logística</strong>.
+              </p>
             </div>
           )}
 
@@ -475,16 +812,17 @@ export default function ProductosABM() {
                 <tr>
                   <th>Código</th>
                   <th>Producto</th>
+                  <th>Proveedor</th>
                   <th className="right">Precio Venta</th>
                   <th className="right">Stock Disponible</th>
-                  <th className="right">Acciones</th>
+                  {ambito === 'cd' && <th className="right">Acciones</th>}
                 </tr>
               </thead>
               <tbody>
                 {stockEstablecimiento.length === 0 ? (
                   <tr>
-                    <td colSpan="5" className="empty">
-                      No hay productos asignados a este establecimiento.
+                    <td colSpan={ambito === 'cd' ? 6 : 5} className="empty">
+                      No hay productos registrados en este establecimiento.
                     </td>
                   </tr>
                 ) : (
@@ -492,17 +830,20 @@ export default function ProductosABM() {
                     <tr key={item.idStockItem}>
                       <td>{item.codigoBarras}</td>
                       <td className="strong">{item.nombre}</td>
+                      <td>{item.proveedorNombre || '-'}</td>
                       <td className="right">${item.precioVenta}</td>
                       <td className="right">{item.cantidadDisponible} u.</td>
-                      <td className="right">
-                        <button
-                          type="button"
-                          className="btn btn-danger btn-sm"
-                          onClick={() => setModalQuitarLocal(item)}
-                        >
-                          Quitar de Establecimiento
-                        </button>
-                      </td>
+                      {ambito === 'cd' && (
+                        <td className="right">
+                          <button
+                            type="button"
+                            className="btn btn-danger btn-sm"
+                            onClick={() => setModalQuitarLocal(item)}
+                          >
+                            Quitar de Establecimiento
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   ))
                 )}
@@ -512,7 +853,7 @@ export default function ProductosABM() {
         </section>
       )}
 
-      {/* SECCIÓN 3: Apartado para Añadir un Nuevo Producto (Arriba de Catálogo y debajo de Productos actuales) */}
+      {/* SECCIÓN 3: Apartado para Añadir un Nuevo Producto (con Proveedor y Categoría) */}
       <section className="card">
         <h3 className="card-title">Añadir Nuevo Producto</h3>
 
@@ -578,6 +919,31 @@ export default function ProductosABM() {
               {erroresNuevoProd.idCategoria && (
                 <div style={{ color: '#cf1322', fontSize: '12px', marginTop: '4px' }}>
                   {erroresNuevoProd.idCategoria}
+                </div>
+              )}
+            </div>
+
+            <div>
+              <select
+                className="select"
+                value={formNuevoProd.idProveedor}
+                onChange={e => {
+                  setFormNuevoProd({ ...formNuevoProd, idProveedor: e.target.value });
+                  if (erroresNuevoProd.idProveedor) setErroresNuevoProd({ ...erroresNuevoProd, idProveedor: null });
+                }}
+                style={{ width: '100%' }}
+                required
+              >
+                <option value="">-- Seleccionar Proveedor --</option>
+                {proveedores.map(prov => (
+                  <option key={prov.idProveedor} value={prov.idProveedor}>
+                    {prov.razonSocial} (CUIT: {prov.cuit})
+                  </option>
+                ))}
+              </select>
+              {erroresNuevoProd.idProveedor && (
+                <div style={{ color: '#cf1322', fontSize: '12px', marginTop: '4px' }}>
+                  {erroresNuevoProd.idProveedor}
                 </div>
               )}
             </div>
@@ -652,7 +1018,7 @@ export default function ProductosABM() {
         </form>
       </section>
 
-      {/* SECCIÓN 4: Catálogo de Productos con Filtro por Categoría y Deshabilitar/Habilitar */}
+      {/* SECCIÓN 4: Catálogo de Productos con Filtros por Categoría y Proveedor */}
       <section className="card">
         <div
           style={{
@@ -666,21 +1032,40 @@ export default function ProductosABM() {
         >
           <h3 className="card-title" style={{ margin: 0 }}>Catálogo de Productos</h3>
 
-          <div className="field-inline">
-            <label htmlFor="filtro-categoria-catalogo">Filtrar por Categoría:</label>
-            <select
-              id="filtro-categoria-catalogo"
-              className="select"
-              value={filtroCategoriaId}
-              onChange={e => setFiltroCategoriaId(e.target.value)}
-            >
-              <option value="TODAS">Todas las categorías ({productosGlobales.length})</option>
-              {categorias.map(cat => (
-                <option key={cat.idCategoria} value={cat.idCategoria}>
-                  {cat.nombre}
-                </option>
-              ))}
-            </select>
+          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+            <div className="field-inline">
+              <label htmlFor="filtro-categoria-catalogo">Categoría:</label>
+              <select
+                id="filtro-categoria-catalogo"
+                className="select"
+                value={filtroCategoriaId}
+                onChange={e => setFiltroCategoriaId(e.target.value)}
+              >
+                <option value="TODAS">Todas ({productosGlobales.length})</option>
+                {categorias.map(cat => (
+                  <option key={cat.idCategoria} value={cat.idCategoria}>
+                    {cat.nombre}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="field-inline">
+              <label htmlFor="filtro-proveedor-catalogo">Proveedor:</label>
+              <select
+                id="filtro-proveedor-catalogo"
+                className="select"
+                value={filtroProveedorId}
+                onChange={e => setFiltroProveedorId(e.target.value)}
+              >
+                <option value="TODOS">Todos</option>
+                {proveedores.map(prov => (
+                  <option key={prov.idProveedor} value={prov.idProveedor}>
+                    {prov.razonSocial}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
 
@@ -692,6 +1077,7 @@ export default function ProductosABM() {
                 <th>Código</th>
                 <th>Nombre</th>
                 <th>Categoría</th>
+                <th>Proveedor</th>
                 <th className="right">Precio Venta</th>
                 <th className="right">Costo</th>
                 <th>Estado</th>
@@ -701,8 +1087,8 @@ export default function ProductosABM() {
             <tbody>
               {productosFiltradosCatalogo.length === 0 ? (
                 <tr>
-                  <td colSpan="8" className="empty">
-                    No hay productos en la categoría seleccionada.
+                  <td colSpan="9" className="empty">
+                    No hay productos que coincidan con los filtros seleccionados.
                   </td>
                 </tr>
               ) : (
@@ -711,6 +1097,10 @@ export default function ProductosABM() {
                   const catNombre =
                     p.categoriaNombre ||
                     categorias.find(c => Number(c.idCategoria) === Number(p.idCategoria))?.nombre ||
+                    '-';
+                  const provNombre =
+                    p.proveedorNombre ||
+                    proveedores.find(pr => Number(pr.idProveedor) === Number(p.idProveedor))?.razonSocial ||
                     '-';
 
                   return (
@@ -722,6 +1112,7 @@ export default function ProductosABM() {
                       <td>{p.codigoBarras}</td>
                       <td className="strong">{p.nombre}</td>
                       <td>{catNombre}</td>
+                      <td>{provNombre}</td>
                       <td className="right">${p.precioVenta}</td>
                       <td className="right">${p.costoUnitario}</td>
                       <td>
@@ -764,8 +1155,8 @@ export default function ProductosABM() {
         </div>
       </section>
 
-      {/* MODAL 1: CONFIRMAR GUARDAR STOCK EN ESTABLECIMIENTO */}
-      {modalConfirmarStock && (
+      {/* MODAL 1: CONFIRMAR PEDIDO GRANDE A PROVEEDORES (CD) */}
+      {modalConfirmarPedidoGrande && (
         <div
           style={{
             position: 'fixed',
@@ -780,33 +1171,76 @@ export default function ProductosABM() {
             zIndex: 1000
           }}
         >
-          <div className="card" style={{ maxWidth: '450px', width: '90%', textAlign: 'center', margin: 0, borderTop: '5px solid #1890ff' }}>
-            <h3 className="card-title">Confirmar Asignación de Stock</h3>
-            <p className="muted">
-              ¿Desea asignar/actualizar el stock del siguiente producto en{' '}
-              <strong className="strong">{modalConfirmarStock.establecimientoNombre}</strong>?
+          <div className="card" style={{ maxWidth: '560px', width: '92%', margin: 0, borderTop: '5px solid #1890ff' }}>
+            <h3 className="card-title" style={{ textAlign: 'center' }}>
+              Confirmar Pedido a Proveedores
+            </h3>
+            <p className="muted" style={{ textAlign: 'center' }}>
+              Destino: <strong className="strong">{modalConfirmarPedidoGrande.establecimientoNombre}</strong>
+              <br />
+              Proveedor(es): <strong className="strong">{modalConfirmarPedidoGrande.proveedoresResumen}</strong>
             </p>
+
             <div
               style={{
-                margin: '14px 0',
-                padding: '12px',
-                backgroundColor: 'rgba(24, 144, 255, 0.08)',
-                border: '1px solid rgba(24, 144, 255, 0.3)',
-                borderRadius: '6px'
+                margin: '12px 0',
+                padding: '10px',
+                backgroundColor: 'rgba(24, 144, 255, 0.06)',
+                border: '1px solid rgba(24, 144, 255, 0.25)',
+                borderRadius: '6px',
+                maxHeight: '240px',
+                overflowY: 'auto'
               }}
             >
-              <div className="strong">{modalConfirmarStock.productoNombre}</div>
-              <div className="muted" style={{ fontSize: '12px' }}>Cód: {modalConfirmarStock.codigoBarras}</div>
-              <div style={{ fontSize: '20px', fontWeight: 'bold', marginTop: '6px', color: '#1890ff' }}>
-                {modalConfirmarStock.cantidadDisponible} unidades
+              <table className="table" style={{ fontSize: '13px' }}>
+                <thead>
+                  <tr>
+                    <th>Producto</th>
+                    <th>Proveedor</th>
+                    <th className="right">Cant.</th>
+                    <th className="right">Subtotal</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {modalConfirmarPedidoGrande.items.map(it => (
+                    <tr key={it.idProducto}>
+                      <td className="strong">{it.nombre}</td>
+                      <td>{it.proveedorNombre}</td>
+                      <td className="right">+{it.cantidad} u.</td>
+                      <td className="right">
+                        ${(it.cantidad * it.costoUnitario).toLocaleString('es-AR', {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2
+                        })}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div style={{ textAlign: 'center', fontSize: '14px', lineHeight: '1.6' }}>
+              <div>
+                Total de productos distintos: <strong>{modalConfirmarPedidoGrande.items.length}</strong> | Total unidades:{' '}
+                <strong style={{ color: '#1890ff' }}>+{modalConfirmarPedidoGrande.totalUnidades} u.</strong>
+              </div>
+              <div>
+                Costo total estimado:{' '}
+                <strong>
+                  ${modalConfirmarPedidoGrande.costoTotal.toLocaleString('es-AR', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                  })}
+                </strong>
               </div>
             </div>
+
             <div style={{ display: 'flex', justifyContent: 'center', gap: '15px', marginTop: '20px' }}>
-              <button type="button" className="btn" onClick={() => setModalConfirmarStock(null)}>
+              <button type="button" className="btn" onClick={() => setModalConfirmarPedidoGrande(null)}>
                 Cancelar
               </button>
-              <button type="button" className="btn btn-primary" onClick={ejecutarGuardarStockLocal}>
-                Confirmar
+              <button type="button" className="btn btn-primary" onClick={ejecutarConfirmarPedidoGrande}>
+                Confirmar e Ingresar Stock
               </button>
             </div>
           </div>
@@ -829,7 +1263,7 @@ export default function ProductosABM() {
             zIndex: 1000
           }}
         >
-          <div className="card" style={{ maxWidth: '450px', width: '90%', textAlign: 'center', margin: 0, borderTop: '5px solid #52c41a' }}>
+          <div className="card" style={{ maxWidth: '460px', width: '90%', textAlign: 'center', margin: 0, borderTop: '5px solid #52c41a' }}>
             <h3 className="card-title">¿Confirmar Nuevo Producto?</h3>
             <p className="muted">Se añadirá el siguiente producto al Catálogo:</p>
             <div
@@ -846,6 +1280,7 @@ export default function ProductosABM() {
               <div><span className="muted">Código:</span> <strong>{modalConfirmarNuevoProd.codigoBarras}</strong></div>
               <div><span className="muted">Nombre:</span> <strong className="strong">{modalConfirmarNuevoProd.nombre}</strong></div>
               <div><span className="muted">Categoría:</span> <strong>{modalConfirmarNuevoProd.categoriaNombre}</strong></div>
+              <div><span className="muted">Proveedor:</span> <strong>{modalConfirmarNuevoProd.proveedorNombre}</strong></div>
               <div><span className="muted">Precio Venta:</span> <strong>${modalConfirmarNuevoProd.precioVenta}</strong></div>
               <div><span className="muted">Costo Unitario:</span> <strong>${modalConfirmarNuevoProd.costoUnitario}</strong></div>
               <div><span className="muted">Stock Mínimo:</span> <strong>{modalConfirmarNuevoProd.stockMinimo} u.</strong></div>
@@ -905,8 +1340,8 @@ export default function ProductosABM() {
             </p>
             <p className="muted" style={{ lineHeight: '1.4' }}>
               {modalEstadoProducto.nuevoEstado
-                ? 'Al habilitar este producto, volverá a estar disponible para asignar unidades en Centros de Distribución y Sucursales.'
-                : 'El producto NO se eliminará de la base de datos, pero quedará deshabilitado y no se le podrán asignar nuevas unidades hasta que vuelva a habilitarse.'}
+                ? 'Al habilitar este producto, volverá a estar disponible para pedir unidades a proveedores en el Centro de Distribución.'
+                : 'El producto NO se eliminará de la base de datos, pero quedará deshabilitado y no se le podrán pedir unidades hasta que vuelva a habilitarse.'}
             </p>
             <div style={{ display: 'flex', justifyContent: 'center', gap: '15px', marginTop: '20px' }}>
               <button type="button" className="btn" onClick={() => setModalEstadoProducto(null)}>
@@ -929,7 +1364,7 @@ export default function ProductosABM() {
         </div>
       )}
 
-      {/* MODAL 4: QUITAR PRODUCTO DE ESTABLECIMIENTO PUNTUAL */}
+      {/* MODAL 4: QUITAR PRODUCTO DEL CD */}
       {modalQuitarLocal && (
         <div
           style={{
@@ -946,7 +1381,7 @@ export default function ProductosABM() {
           }}
         >
           <div className="card" style={{ maxWidth: '430px', width: '90%', textAlign: 'center', margin: 0, borderTop: '5px solid #ff4d4f' }}>
-            <h3 className="card-title" style={{ color: '#cf1322' }}>Quitar Producto del Establecimiento</h3>
+            <h3 className="card-title" style={{ color: '#cf1322' }}>Quitar Producto del Centro de Distribución</h3>
             <p className="muted">
               ¿Desea desvincular <strong className="strong">{modalQuitarLocal.nombre}</strong> de{' '}
               <strong className="strong">{establecimientoActivo?.nombre}</strong>?
