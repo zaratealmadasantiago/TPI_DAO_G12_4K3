@@ -128,8 +128,28 @@ export const apiService = {
     const res = await fetch(url);
     return res.json();
   },
+  getReporteMasVendidos: async (fDesde, fHasta, idSucursal, limite = 10) => {
+    const url = new URL(`${API_BASE_URL}/reportes/productos-mas-vendidos`);
+    if (fDesde) url.searchParams.append('fecha_desde', fDesde);
+    if (fHasta) url.searchParams.append('fecha_hasta', fHasta);
+    if (idSucursal) url.searchParams.append('id_sucursal', idSucursal);
+    url.searchParams.append('limite', limite);
+    const res = await fetch(url);
+    return res.json();
+  },
+  getReporteStock: async (idEstablecimiento, soloMinimo) => {
+    const url = new URL(`${API_BASE_URL}/reportes/stock`);
+    if (idEstablecimiento) url.searchParams.append('id_establecimiento', idEstablecimiento);
+    if (soloMinimo) url.searchParams.append('solo_minimo', '1');
+    const res = await fetch(url);
+    return res.json();
+  },
   getBultosRechazados: async () => {
     const res = await fetch(`${API_BASE_URL}/reportes/bultos-rechazados`);
+    return res.json();
+  },
+  getReporteTiempoTransito: async () => {
+    const res = await fetch(`${API_BASE_URL}/reportes/tiempo-transito`);
     return res.json();
   },
 
